@@ -339,10 +339,31 @@ void App::Update()
 		//MESSAGE_TYPE_GUI_CHAR which is just the down and includes keyboard repeats from
 		//holding the key
 		GetBaseApp()->m_sig_raw_keyboard.connect(&AppInputRawKeyboard);
-		
+
 	}
-	
-	//game is thinking.  
+
+	// Phase 1: Drive Player + Camera per frame
+	float dt = GetBaseApp()->GetElapsedTime();  // delta in seconds
+
+	m_player.SetInput(m_inputLeft, m_inputRight, m_inputJump);
+	m_player.Update(dt);
+
+	m_camera.SetTarget(m_player.GetPosition());
+	m_camera.Update(dt);
+
+	m_inputJump = false;  // consume edge-trigger after Player has read it
+
+	// Debug log every ~60 frames to avoid spam
+	static int s_frameCounter = 0;
+	if ((++s_frameCounter % 60) == 0)
+	{
+		CL_Vec2f pos = m_player.GetPosition();
+		CL_Vec2f vel = m_player.GetVelocity();
+		LogMsg("Player Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d",
+			pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0);
+	}
+
+	//game is thinking.
 }
 
 void App::Draw()
