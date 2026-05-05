@@ -1,7 +1,7 @@
 #pragma once
 #include "PlatformPrecomp.h"
 
-class Camera;  // forward declaration — Player uses Camera in Draw only
+class Camera;
 
 class Player
 {
@@ -10,7 +10,7 @@ public:
 
     void SetInput(bool inputLeft, bool inputRight, bool inputJump);
     void Update(float deltaTime);
-    void Draw(const Camera &camera) const;
+    void Draw(const Camera &camera);
 
     CL_Vec2f GetPosition() const { return m_position; }
     CL_Vec2f GetVelocity() const { return m_velocity; }
@@ -23,4 +23,14 @@ private:
     bool m_inputLeft;
     bool m_inputRight;
     bool m_inputJump;
+
+    // Phase 1.5b: animation
+    Surface m_spriteIdle;
+    Surface m_spriteWalk1;
+    Surface m_spriteWalk2;
+    Surface m_spriteJump;
+    bool m_spritesLoaded;
+    bool m_facingRight;       // true = facing right, false = facing left
+    float m_walkAnimTimer;    // accumulated time for walk frame cycling
+    bool m_walkFrameToggle;   // toggles between walk1 and walk2
 };
