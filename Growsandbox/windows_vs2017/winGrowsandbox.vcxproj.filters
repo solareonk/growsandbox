@@ -121,6 +121,9 @@
     <ClCompile Include="..\source\App.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\source\Camera.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\shared\win\app\main.cpp">
       <Filter>source</Filter>
     </ClCompile>
@@ -304,6 +307,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\source\App.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\Camera.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\win\app\main.h">
