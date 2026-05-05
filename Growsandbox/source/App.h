@@ -8,6 +8,8 @@
 #pragma once
 
 #include "BaseApp.h"
+#include "Player.h"
+#include "Camera.h"
 
 class App: public BaseApp
 {
@@ -34,6 +36,13 @@ private:
 
 	bool m_bDidPostInit;
 	SurfaceAnim m_surf; //for testing
+
+	// Phase 1 additions
+	Player m_player;
+	Camera m_camera;
+	bool m_inputLeft;
+	bool m_inputRight;
+	bool m_inputJump;
 };
 
 

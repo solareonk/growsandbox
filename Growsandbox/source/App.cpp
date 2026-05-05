@@ -44,8 +44,11 @@ App * GetApp()
 }
 
 App::App()
+	: m_bDidPostInit(false)
+	, m_inputLeft(false)
+	, m_inputRight(false)
+	, m_inputJump(false)
 {
-	m_bDidPostInit = false;
 }
 
 App::~App()
