@@ -158,10 +158,6 @@ void App::OnArcadeInput(VariantList *pVList)
 			if (pressed) m_inputJump = true;  // edge-trigger; consumed by App::Update
 			break;
 	}
-
-	LogMsg("Input: vKey=%d pressed=%d  Flags: L=%d R=%d J=%d",
-		vKey, pressed ? 1 : 0,
-		m_inputLeft ? 1 : 0, m_inputRight ? 1 : 0, m_inputJump ? 1 : 0);
 }
 
 void AppInputRawKeyboard(VariantList *pVList)
@@ -353,16 +349,6 @@ void App::Update()
 
 	m_inputJump = false;  // consume edge-trigger after Player has read it
 
-	// Debug log every ~60 frames to avoid spam
-	static int s_frameCounter = 0;
-	if ((++s_frameCounter % 60) == 0)
-	{
-		CL_Vec2f pos = m_player.GetPosition();
-		CL_Vec2f vel = m_player.GetVelocity();
-		LogMsg("Player Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d",
-			pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0);
-	}
-
 	//game is thinking.
 }
 
@@ -386,6 +372,15 @@ void App::Draw()
 
 	// Player — delegates to Player::Draw which uses camera transform
 	m_player.Draw(m_camera);
+
+	// Debug overlay
+	CL_Vec2f pos = m_player.GetPosition();
+	CL_Vec2f vel = m_player.GetVelocity();
+	char debugBuf[256];
+	snprintf(debugBuf, sizeof(debugBuf),
+		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d",
+		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0);
+	GetFont(FONT_SMALL)->Draw(10.0f, 10.0f, debugBuf);
 
 	// Base handles built-in GUI overlay (FPS counter, etc.)
 	BaseApp::Draw();
