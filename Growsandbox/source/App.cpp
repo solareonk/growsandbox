@@ -9,6 +9,7 @@
 #include "Entity/CustomInputComponent.h" //used for the back button (android)
 #include "Entity/FocusInputComponent.h" //needed to let the input component see input messages
 #include "Entity/ArcadeInputComponent.h"
+#include <cmath>
 //#include "util/TextScanner.h"
 #include "Manager/MessageManager.h"
 MessageManager g_messageManager;
@@ -48,6 +49,7 @@ App::App()
 	, m_inputLeft(false)
 	, m_inputRight(false)
 	, m_inputJump(false)
+	, m_tilesLoaded(false)
 {
 }
 
@@ -361,14 +363,66 @@ void App::Draw()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	CLEAR_GL_ERRORS()
 
-	// Ground — wide green rectangle, transformed by camera
-	CL_Vec2f groundWorldTopLeft(-10000.0f, 500.0f);  // GROUND_Y = 500
-	CL_Vec2f groundScreenTopLeft = m_camera.WorldToScreen(groundWorldTopLeft);
-	DrawFilledRect(
-		groundScreenTopLeft.x, groundScreenTopLeft.y,
-		20000.0f, 1000.0f,
-		MAKE_RGBA(80, 160, 80, 255)
-	);
+	// Ground — tiled with Kenney pixel-platformer tiles
+	if (!m_tilesLoaded)
+	{
+		m_tileGrass.LoadFile("tile_grass.rttex");
+		m_tileDirt.LoadFile("tile_dirt.rttex");
+		m_tilesLoaded = true;
+	}
+
+	if (m_tileGrass.IsLoaded() && m_tileDirt.IsLoaded())
+	{
+		const float TILE_SIZE = 36.0f;        // 18x18 native scaled 2x
+		const float GROUND_Y_WORLD = 500.0f;  // matches Player::GROUND_Y
+
+		// Native sprite size for sampling
+		float texW = (float)m_tileGrass.GetWidth();
+		float texH = (float)m_tileGrass.GetHeight();
+		rtRectf srcRect(0.0f, 0.0f, texW, texH);
+
+		// Determine which world X column the camera leftmost screen edge is at
+		CL_Vec2f camPos = m_camera.GetPosition();
+		float screenW = GetScreenSizeXf();
+		float screenH = GetScreenSizeYf();
+
+		float worldLeft = camPos.x - screenW * 0.5f;
+		float worldRight = camPos.x + screenW * 0.5f;
+
+		// Snap to tile grid: first tile column visible
+		int firstCol = (int)std::floor(worldLeft / TILE_SIZE) - 1;  // -1 buffer
+		int lastCol  = (int)std::floor(worldRight / TILE_SIZE) + 1;
+
+		// Number of dirt rows below the grass surface (enough to cover bottom of screen)
+		int dirtRows = (int)std::ceil((screenH * 0.5f + (screenH * 0.5f - GROUND_Y_WORLD + camPos.y)) / TILE_SIZE) + 2;
+		if (dirtRows < 8) dirtRows = 8;  // floor: at least 8 rows worth of dirt below
+
+		for (int col = firstCol; col <= lastCol; col++)
+		{
+			float worldX = col * TILE_SIZE;
+
+			// Surface tile (grass) at top
+			CL_Vec2f surfaceWorldPos(worldX, GROUND_Y_WORLD);
+			CL_Vec2f surfaceScreenPos = m_camera.WorldToScreen(surfaceWorldPos);
+			rtRectf dstSurface(
+				surfaceScreenPos.x, surfaceScreenPos.y,
+				surfaceScreenPos.x + TILE_SIZE, surfaceScreenPos.y + TILE_SIZE
+			);
+			m_tileGrass.BlitEx(dstSurface, srcRect);
+
+			// Dirt fill rows below
+			for (int row = 1; row <= dirtRows; row++)
+			{
+				CL_Vec2f dirtWorldPos(worldX, GROUND_Y_WORLD + row * TILE_SIZE);
+				CL_Vec2f dirtScreenPos = m_camera.WorldToScreen(dirtWorldPos);
+				rtRectf dstDirt(
+					dirtScreenPos.x, dirtScreenPos.y,
+					dirtScreenPos.x + TILE_SIZE, dirtScreenPos.y + TILE_SIZE
+				);
+				m_tileDirt.BlitEx(dstDirt, srcRect);
+			}
+		}
+	}
 
 	// Player — delegates to Player::Draw which uses camera transform
 	m_player.Draw(m_camera);

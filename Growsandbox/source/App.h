@@ -43,6 +43,11 @@ private:
 	bool m_inputLeft;
 	bool m_inputRight;
 	bool m_inputJump;
+
+	// Phase 1.5c: ground tiles
+	Surface m_tileGrass;
+	Surface m_tileDirt;
+	bool m_tilesLoaded;
 };
 
 
