@@ -79,3 +79,12 @@ RTConsole/build
 RTConsole/bin/RTConsole
 shared/.vscode
 /.vscode/settings.json
+
+# Phase 1.5: Kenney asset packs (extracted) — only .rttex outputs in Growsandbox/media are committed
+kenney_platformer-characters/
+kenney_pixel-platformer/
+
+# Declined: tile_halaman_1 (likely Growtopia derivative — see ASSET_POLICY)
+tiles_halaman_1.png
+tiles_halaman_1.rttex
+custom_items/
