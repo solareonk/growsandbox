@@ -142,49 +142,26 @@ void App::OnAccel(VariantList *pVList)
 
 void App::OnArcadeInput(VariantList *pVList)
 {
-
 	int vKey = pVList->Get(0).GetUINT32();
 	eVirtualKeyInfo keyInfo = (eVirtualKeyInfo) pVList->Get(1).GetUINT32();
-	
-	string pressed;
-
-	switch (keyInfo)
-	{
-		case VIRTUAL_KEY_PRESS:
-			pressed = "pressed";
-			break;
-
-		case VIRTUAL_KEY_RELEASE:
-			pressed = "released";
-			break;
-
-		default:
-			LogMsg("OnArcadeInput> Bad value of %d", keyInfo);
-	}
-	
-	string keyName = "unknown";
+	bool pressed = (keyInfo == VIRTUAL_KEY_PRESS);
 
 	switch (vKey)
 	{
 		case VIRTUAL_KEY_DIR_LEFT:
-			keyName = "Left";
+			m_inputLeft = pressed;
 			break;
-
-		case VIRTUAL_KEY_DIR_UP:
-			keyName = "Up";
-			break;
-
 		case VIRTUAL_KEY_DIR_RIGHT:
-			keyName = "Right";
+			m_inputRight = pressed;
 			break;
-
-		case VIRTUAL_KEY_DIR_DOWN:
-			keyName = "Down";
+		case VIRTUAL_KEY_GAME_JUMP:
+			if (pressed) m_inputJump = true;  // edge-trigger; consumed by App::Update
 			break;
-
 	}
-	
-	LogMsg("Arcade input: Hit %d (%s) (%s)", vKey, keyName.c_str(), pressed.c_str());
+
+	LogMsg("Input: vKey=%d pressed=%d  Flags: L=%d R=%d J=%d",
+		vKey, pressed ? 1 : 0,
+		m_inputLeft ? 1 : 0, m_inputRight ? 1 : 0, m_inputJump ? 1 : 0);
 }
 
 void AppInputRawKeyboard(VariantList *pVList)
@@ -352,6 +329,7 @@ void App::Update()
 		AddKeyBinding(pComp, "Up", VIRTUAL_KEY_DIR_UP, VIRTUAL_KEY_DIR_UP);
 		AddKeyBinding(pComp, "Down", VIRTUAL_KEY_DIR_DOWN, VIRTUAL_KEY_DIR_DOWN);
 		AddKeyBinding(pComp, "Fire", VIRTUAL_KEY_CONTROL, VIRTUAL_KEY_GAME_FIRE);
+		AddKeyBinding(pComp, "Jump", VIRTUAL_KEY_DIR_UP, VIRTUAL_KEY_GAME_JUMP);
 
 		//INPUT TEST - wire up input to some functions to manually handle.  AppInput will use LogMsg to
 		//send them to the log.  (Each device has a way to view a debug log in real-time)
