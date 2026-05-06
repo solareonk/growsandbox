@@ -31,3 +31,7 @@ const TileType& GetTileType(TileTypeID id);
 // Returns NULL for TILE_AIR or if asset failed to load.
 class Surface;
 Surface* GetTileSurface(TileTypeID id);
+
+// Releases all lazy-loaded tile surfaces. Must be called from App::Kill()
+// BEFORE BaseApp::Kill(), while the GL context is still alive.
+void TileRegistry_Shutdown();

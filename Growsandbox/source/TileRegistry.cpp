@@ -28,8 +28,23 @@ Surface* GetTileSurface(TileTypeID id)
     if (!s_surfaceLoaded[id])
     {
         const char* asset = s_tileTypes[id].asset;
-        if (asset) s_surfaces[id].LoadFile(asset);
+        if (asset && !s_surfaces[id].LoadFile(asset))
+        {
+            LogError("TileRegistry: failed to load asset '%s' for tile %d", asset, (int)id);
+        }
         s_surfaceLoaded[id] = true;
     }
     return s_surfaces[id].IsLoaded() ? &s_surfaces[id] : NULL;
+}
+
+void TileRegistry_Shutdown()
+{
+    for (int i = 0; i < TILE_TYPE_COUNT; i++)
+    {
+        if (s_surfaceLoaded[i])
+        {
+            s_surfaces[i].Kill();
+            s_surfaceLoaded[i] = false;
+        }
+    }
 }
