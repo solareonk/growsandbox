@@ -80,7 +80,53 @@ App::App()
 	, m_worldGenerated(false)
 	, m_mousePos(0.0f, 0.0f)
 	, m_mouseDown(false)
+	, m_handleDragging(false)
+	, m_handleDragStartY(0.0f)
+	, m_backpackAnim(0.0f)
 {
+}
+
+// Phase 3b: animated UI positions — both hotbar and backpack lerp from
+// closed (bottom of screen) to open (lifted up) using m_backpackAnim.
+// Smooth ease: 3t^2 - 2t^3.
+int App::GetHotbarY() const
+{
+	const int CLOSED_Y = 708;          // normal bottom-of-screen position
+	const int OPEN_Y   = 540;          // lifted up to make room for backpack above
+	float t = m_backpackAnim;
+	float ease = t * t * (3.0f - 2.0f * t);
+	return (int)(CLOSED_Y + (OPEN_Y - CLOSED_Y) * ease);
+}
+
+int App::GetBackpackPanelY() const
+{
+	// Phase 3b: panel sits BELOW hotbar (Growtopia-style).
+	// Hotbar Y_open=540, hotbar height=48, gap=12 → panel top = 600.
+	// Panel height = 24 (title) + 144 (grid) = 168 → panel bottom = 768 (screen edge).
+	const int CLOSED_Y = 768 + 168;    // offscreen below screen entirely
+	const int OPEN_Y   = 600;          // just below hotbar when fully open
+	float t = m_backpackAnim;
+	float ease = t * t * (3.0f - 2.0f * t);
+	return (int)(CLOSED_Y + (OPEN_Y - CLOSED_Y) * ease);
+}
+
+// Phase 3b: drag-gesture end handler (Grab-app style).
+// Threshold: 20px swipe up = open backpack, 20px swipe down = close.
+// Click without drag (delta < threshold) = no-op.
+void App::EndHandleDrag(float endY)
+{
+	if (!m_handleDragging) return;
+	float delta = m_handleDragStartY - endY;  // positive = moved up
+	const float THRESHOLD = 20.0f;
+	if (delta > THRESHOLD)
+	{
+		if (!m_inventory.IsBackpackOpen()) m_inventory.ToggleBackpack();
+	}
+	else if (delta < -THRESHOLD)
+	{
+		if (m_inventory.IsBackpackOpen()) m_inventory.CloseBackpack();
+	}
+	m_handleDragging = false;
 }
 
 App::~App()
@@ -300,10 +346,9 @@ void AppInputRawKeyboard(VariantList *pVList)
             if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(3);
             keyName = "4 (slot 3)";
             break;
-        case 'E':
-        case 'e':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().ToggleBackpack();
-            keyName = "E (backpack toggle)";
+        case '5':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(4);
+            keyName = "5 (slot 4)";
             break;
         case 'R':
         case 'r':
@@ -367,12 +412,20 @@ void AppInput(VariantList *pVList)
 			int mx = (int)pt.x;
 			int my = (int)pt.y;
 
+			// Phase 3b UI: grab handle bar above hotbar — drag up/down to toggle backpack
+			if (app->HitTestBackpackHandle(mx, my))
+			{
+				app->SetHandleDragStart((float)my);
+				app->SetMouseDown(false);
+				break;
+			}
+
 			// Hotbar always clickable
 			int hbIdx = app->HitTestHotbarSlot(mx, my);
 			if (hbIdx >= 0)
 			{
 				inv.SetSelectedHotbarSlot(hbIdx);
-				app->SetMouseDown(false);  // do NOT trigger world action
+				app->SetMouseDown(false);
 				break;
 			}
 
@@ -382,12 +435,19 @@ void AppInput(VariantList *pVList)
 				if (bpIdx >= 0)
 				{
 					inv.ClickBackpackSlot(bpIdx);
+					app->SetMouseDown(false);
+					break;
 				}
-				app->SetMouseDown(false);  // backpack open absorbs all world clicks
-				break;
+				// Absorb clicks on panel chrome (title bar, background)
+				if (app->HitTestBackpackPanel(mx, my))
+				{
+					app->SetMouseDown(false);
+					break;
+				}
+				// Click in world area (above panel) — propagate to punch/place
 			}
 
-			// Backpack closed, no slot hit → world click (Phase 2 behavior)
+			// No UI element hit → world click
 			app->SetMouseDown(true);
 		}
 		else
@@ -422,6 +482,11 @@ void AppInput(VariantList *pVList)
 	case MESSAGE_TYPE_GUI_CLICK_END:
 		GetApp()->SetMousePos(pt);
 		GetApp()->SetMouseDown(false);
+		// Phase 3b: finalize handle drag if in progress
+		if (GetApp()->IsHandleDragging())
+		{
+			GetApp()->EndHandleDrag(pt.y);
+		}
 		break;
 
 	case MESSAGE_TYPE_GUI_CHAR:
@@ -500,10 +565,24 @@ void App::Update()
 	m_camera.SetTarget(m_player.GetPosition());
 	m_camera.Update(dt);
 
-	if (!m_inventory.IsBackpackOpen())
+	// Phase 3b: interaction always runs — player can punch tiles even with
+	// backpack open, as long as the click landed in the world area (not on UI).
+	// Click absorption happens in the click handler.
+	m_interaction.Update(m_world, m_player, m_camera,
+	                     m_mousePos, m_mouseDown, m_inventory, dt);
+
+	// Phase 3b: tick backpack slide animation toward target (4.0/sec = 250ms full transition)
+	float target = m_inventory.IsBackpackOpen() ? 1.0f : 0.0f;
+	const float ANIM_RATE = 4.0f;
+	if (m_backpackAnim < target)
 	{
-		m_interaction.Update(m_world, m_player, m_camera,
-		                     m_mousePos, m_mouseDown, m_inventory, dt);
+		m_backpackAnim += ANIM_RATE * dt;
+		if (m_backpackAnim > target) m_backpackAnim = target;
+	}
+	else if (m_backpackAnim > target)
+	{
+		m_backpackAnim -= ANIM_RATE * dt;
+		if (m_backpackAnim < target) m_backpackAnim = target;
 	}
 
 	m_inputJump = false;  // consume edge-trigger after Player has read it
@@ -742,11 +821,25 @@ const char * GetBundleName()
 int App::HitTestHotbarSlot(int mx, int my)
 {
     const int SLOT_SIZE   = 48;
-    const int HOTBAR_X    = (1024 - 4 * SLOT_SIZE) / 2;  // 416
-    const int HOTBAR_Y    = 768 - 12 - SLOT_SIZE;        // 708
+    const int HOTBAR_X    = (1024 - 5 * SLOT_SIZE) / 2;  // 392
+    const int HOTBAR_Y    = GetHotbarY();                 // animated
     if (my < HOTBAR_Y || my >= HOTBAR_Y + SLOT_SIZE) return -1;
-    if (mx < HOTBAR_X || mx >= HOTBAR_X + 4 * SLOT_SIZE) return -1;
+    if (mx < HOTBAR_X || mx >= HOTBAR_X + 5 * SLOT_SIZE) return -1;
     return (mx - HOTBAR_X) / SLOT_SIZE;
+}
+
+// Phase 3b UI: drag handle bar above hotbar (Grab-app style swipe).
+// Hit zone follows the animated hotbar position.
+bool App::HitTestBackpackHandle(int mx, int my)
+{
+    const int HANDLE_HIT_W = 200;
+    const int HANDLE_HIT_H = 32;
+    const int HANDLE_X     = (1024 - HANDLE_HIT_W) / 2;
+    const int HOTBAR_Y     = GetHotbarY();
+    const int HANDLE_Y     = HOTBAR_Y - HANDLE_HIT_H;     // just above animated hotbar
+    if (my < HANDLE_Y || my >= HANDLE_Y + HANDLE_HIT_H) return false;
+    if (mx < HANDLE_X || mx >= HANDLE_X + HANDLE_HIT_W) return false;
+    return true;
 }
 
 int App::HitTestBackpackSlot(int mx, int my)
@@ -755,7 +848,7 @@ int App::HitTestBackpackSlot(int mx, int my)
     const int SLOT_SIZE = 48;
     const int BP_X      = (1024 - 10 * SLOT_SIZE) / 2;  // 272
     const int TITLE_H   = 24;
-    const int BP_Y      = 708 - 12 - (3 * SLOT_SIZE + TITLE_H);  // 528
+    const int BP_Y      = GetBackpackPanelY();           // animated
     int gridY = BP_Y + TITLE_H;
     if (my < gridY || my >= gridY + 3 * SLOT_SIZE) return -1;
     if (mx < BP_X || mx >= BP_X + 10 * SLOT_SIZE) return -1;
@@ -764,16 +857,48 @@ int App::HitTestBackpackSlot(int mx, int my)
     return row * 10 + col;
 }
 
-// Stubs for Tasks 6-7. Empty bodies keep this task's build clean.
+// Phase 3b: any click within the backpack panel rectangle (title bar + grid).
+// Used to absorb clicks on chrome (not just slots) so they don't propagate to world.
+bool App::HitTestBackpackPanel(int mx, int my)
+{
+    if (!m_inventory.IsBackpackOpen()) return false;
+    const int SLOT_SIZE = 48;
+    const int BP_X      = (1024 - 10 * SLOT_SIZE) / 2;
+    const int TITLE_H   = 24;
+    const int BP_Y      = GetBackpackPanelY();
+    const int PANEL_W   = 10 * SLOT_SIZE;
+    const int PANEL_H   = TITLE_H + 3 * SLOT_SIZE;
+    return mx >= BP_X && mx < BP_X + PANEL_W
+        && my >= BP_Y && my < BP_Y + PANEL_H;
+}
+
 void App::DrawHotbar()
 {
     const int SLOT_SIZE   = 48;
-    const int HOTBAR_X    = (1024 - 4 * SLOT_SIZE) / 2;  // 416
-    const int HOTBAR_Y    = 768 - 12 - SLOT_SIZE;        // 708
+    const int HOTBAR_X    = (1024 - 5 * SLOT_SIZE) / 2;  // 392
+    const int HOTBAR_Y    = GetHotbarY();                 // animated
+
+    // Phase 3b UI: grab-handle bar above hotbar (Grab-app style drag-to-toggle).
+    // Visual is thick + tray background to make swipe affordance obvious.
+    {
+        const int HANDLE_W = 160;
+        const int HANDLE_X = (1024 - HANDLE_W) / 2;
+        const int HANDLE_Y = HOTBAR_Y - 16;     // ~16 px gap above hotbar
+        // Tray area (matches hit zone, semi-transparent)
+        DrawFilledRect((float)(HANDLE_X - 20), (float)(HANDLE_Y - 8),
+                       (float)(HANDLE_W + 40), 28.0f,
+                       MAKE_RGBA(0, 0, 0, 140));
+        // The handle bar itself — thicker (8px) and brighter when backpack open
+        uint32 barColor = m_inventory.IsBackpackOpen()
+            ? MAKE_RGBA(255, 220, 60, 255)   // yellow when open
+            : MAKE_RGBA(200, 200, 200, 240); // light gray when closed
+        DrawFilledRect((float)HANDLE_X, (float)HANDLE_Y,
+                       (float)HANDLE_W, 8.0f, barColor);
+    }
 
     // Background panel — semi-transparent dark
     DrawFilledRect((float)HOTBAR_X - 4, (float)HOTBAR_Y - 4,
-                   (float)(4 * SLOT_SIZE + 8), (float)(SLOT_SIZE + 8),
+                   (float)(5 * SLOT_SIZE + 8), (float)(SLOT_SIZE + 8),
                    MAKE_RGBA(0, 0, 0, 180));
 
     int selected = m_inventory.GetSelectedHotbarSlot();
@@ -835,27 +960,28 @@ void App::DrawHotbar()
 }
 void App::DrawBackpack()
 {
-    if (!m_inventory.IsBackpackOpen()) return;
+    // Phase 3b: skip render only when fully closed AND no animation in progress
+    if (m_backpackAnim <= 0.001f) return;
 
     const int SLOT_SIZE = 48;
     const int BP_X      = (1024 - 10 * SLOT_SIZE) / 2;  // 272
     const int TITLE_H   = 24;
-    const int BP_Y      = 708 - 12 - (3 * SLOT_SIZE + TITLE_H);  // 528
-    const int GRID_Y    = BP_Y + TITLE_H;
+    const int bpY       = GetBackpackPanelY();           // animated
+    const int GRID_Y    = bpY + TITLE_H;
     const int PANEL_W   = 10 * SLOT_SIZE;
     const int PANEL_H   = TITLE_H + 3 * SLOT_SIZE;
 
     // Background panel
-    DrawFilledRect((float)(BP_X - 4), (float)(BP_Y - 4),
+    DrawFilledRect((float)(BP_X - 4), (float)(bpY - 4),
                    (float)(PANEL_W + 8), (float)(PANEL_H + 8),
                    MAKE_RGBA(0, 0, 0, 200));
 
     // Title bar
-    DrawFilledRect((float)BP_X, (float)BP_Y,
+    DrawFilledRect((float)BP_X, (float)bpY,
                    (float)PANEL_W, (float)TITLE_H,
                    MAKE_RGBA(60, 60, 80, 240));
-    GetFont(FONT_SMALL)->Draw((float)(BP_X + 8), (float)(BP_Y + 6), "Backpack");
-    GetFont(FONT_SMALL)->Draw((float)(BP_X + PANEL_W - 110), (float)(BP_Y + 6), "(E to close)");
+    GetFont(FONT_SMALL)->Draw((float)(BP_X + 8), (float)(bpY + 6), "Backpack");
+    GetFont(FONT_SMALL)->Draw((float)(BP_X + PANEL_W - 130), (float)(bpY + 6), "(swipe down to close)");
 
     // Slot grid
     for (int row = 0; row < Inventory::BACKPACK_ROWS; row++)

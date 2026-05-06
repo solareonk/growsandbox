@@ -10,7 +10,7 @@ struct InventorySlot
 class Inventory
 {
 public:
-    static const int HOTBAR_SLOTS   = 4;
+    static const int HOTBAR_SLOTS   = 5;
     static const int BACKPACK_ROWS  = 3;
     static const int BACKPACK_COLS  = 10;
     static const int BACKPACK_SLOTS = BACKPACK_ROWS * BACKPACK_COLS;  // 30
