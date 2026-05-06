@@ -10,8 +10,8 @@ enum TileTypeID : uint8_t
     TILE_WOOD_PLANK = 4,
     TILE_CAVE_WALL  = 5,
     TILE_WOOD_WALL  = 6,
-    TILE_BEDROCK    = 7,
-    TILE_TYPE_COUNT
+    TILE_BEDROCK    = 7
+    // TILE_TYPE_COUNT removed Phase 3a — use TileRegistry_GetCount() instead
 };
 
 struct TileType
@@ -43,3 +43,6 @@ void TileRegistry_Shutdown();
 // false on any I/O or format error (caller logs/exits).
 // MUST be called before GetTileType/GetTileSurface.
 bool TileRegistry_Load(const char* path);
+
+// Phase 3a: number of items currently loaded (replaces TILE_TYPE_COUNT).
+size_t TileRegistry_GetCount();

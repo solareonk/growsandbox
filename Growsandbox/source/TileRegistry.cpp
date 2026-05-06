@@ -1,77 +1,32 @@
 #include "PlatformPrecomp.h"
 #include "TileRegistry.h"
+
 #include <vector>
 #include <string>
 #include <cstdio>
 #include <cstring>
 
 // Phase 3a: heap-backed storage for items loaded from items.dat.
-// These coexist with s_tileTypes during the migration; Task 6 swaps consumers over.
 static std::vector<TileType>     s_items;
 static std::vector<std::string>  s_nameStorage;
 static std::vector<std::string>  s_assetStorage;
 static std::vector<std::string>  s_descStorage;
 
+// Phase 3a: surface vectors (promoted from fixed-size arrays).
+// Parallel to s_items by index. Resized lazily on first GetTileSurface call.
+static std::vector<Surface>      s_surfaces;
+static std::vector<bool>         s_surfaceLoaded;
+
 static const char* k_GsbxMagic = "GSBX";
 static const uint16_t k_GsbxExpectedVersion = 1;
 
-static const TileType s_tileTypes[TILE_TYPE_COUNT] = {
-    { TILE_AIR,        "air",        NULL,                    TileType::FG_ONLY, 0, false, "Empty space.",       0,   false },
-    { TILE_GRASS,      "grass",      "tile_grass.rttex",      TileType::FG_ONLY, 3, true,  "Soft and green.",    999, true  },
-    { TILE_DIRT,       "dirt",       "tile_dirt.rttex",       TileType::FG_ONLY, 3, true,  "Plain dirt.",        999, true  },
-    { TILE_STONE,      "stone",      "tile_stone.rttex",      TileType::FG_ONLY, 6, true,  "Tough stuff.",       999, true  },
-    { TILE_WOOD_PLANK, "wood_plank", "tile_wood_plank.rttex", TileType::FG_ONLY, 4, true,  "Sturdy planks.",     999, true  },
-    { TILE_CAVE_WALL,  "cave_wall",  "tile_cave_wall.rttex",  TileType::BG_ONLY, 2, false, "Background wall.",   999, true  },
-    { TILE_WOOD_WALL,  "wood_wall",  "tile_wood_wall.rttex",  TileType::BG_ONLY, 2, false, "Wooden background.", 999, true  },
-    { TILE_BEDROCK,    "bedrock",    "tile_bedrock.rttex",    TileType::FG_ONLY, 0, true,  "Indestructible.",    0,   false }
-};
-
-// Lazy-loaded surfaces, parallel to s_tileTypes by index
-static Surface s_surfaces[TILE_TYPE_COUNT];
-static bool    s_surfaceLoaded[TILE_TYPE_COUNT] = { false };
-
-const TileType& GetTileType(TileTypeID id)
-{
-    if (id >= TILE_TYPE_COUNT) return s_tileTypes[TILE_AIR];
-    return s_tileTypes[id];
-}
-
-Surface* GetTileSurface(TileTypeID id)
-{
-    if (id == TILE_AIR || id >= TILE_TYPE_COUNT) return NULL;
-    if (!s_surfaceLoaded[id])
-    {
-        const char* asset = s_tileTypes[id].asset;
-        if (asset && !s_surfaces[id].LoadFile(asset))
-        {
-            LogError("TileRegistry: failed to load asset '%s' for tile %d", asset, (int)id);
-        }
-        s_surfaceLoaded[id] = true;
-    }
-    return s_surfaces[id].IsLoaded() ? &s_surfaces[id] : NULL;
-}
-
-void TileRegistry_Shutdown()
-{
-    for (int i = 0; i < TILE_TYPE_COUNT; i++)
-    {
-        if (s_surfaceLoaded[i])
-        {
-            s_surfaces[i].Kill();
-            s_surfaceLoaded[i] = false;
-        }
-    }
-}
-
 namespace
 {
-    // Read N bytes into out. Returns false on EOF or short read.
     bool ReadN(FILE* f, void* out, size_t n)
     {
         return fread(out, 1, n, f) == n;
     }
 
-    // Read u8-length-prefixed ASCII string into `out`. Returns false on short read.
     bool ReadLPString(FILE* f, std::string& out)
     {
         uint8_t len = 0;
@@ -91,7 +46,6 @@ bool TileRegistry_Load(const char* path)
         return false;
     }
 
-    // Header
     char magic[4];
     if (!ReadN(f, magic, 4) || memcmp(magic, k_GsbxMagic, 4) != 0)
     {
@@ -123,7 +77,6 @@ bool TileRegistry_Load(const char* path)
         return false;
     }
 
-    // Reserve so push_back never reallocates (pointer stability for c_str()).
     s_items.clear();
     s_nameStorage.clear();
     s_assetStorage.clear();
@@ -189,7 +142,7 @@ bool TileRegistry_Load(const char* path)
 
         TileType t = {};
         t.id = (TileTypeID)id;
-        t.name = NULL;   // pointer set in final pass below
+        t.name = NULL;
         t.asset = NULL;
         t.layer = (layerByte == 1) ? TileType::BG_ONLY : TileType::FG_ONLY;
         t.maxHp = maxHp;
@@ -200,7 +153,6 @@ bool TileRegistry_Load(const char* path)
         s_items.push_back(t);
     }
 
-    // Trailing-data check
     char extra;
     if (fread(&extra, 1, 1, f) != 0)
     {
@@ -211,7 +163,7 @@ bool TileRegistry_Load(const char* path)
     fclose(f);
 
     // Final pass: set string pointers AFTER all push_back complete.
-    // Vectors are reserved so addresses are stable.
+    // Vectors were reserved so addresses remain stable.
     for (size_t i = 0; i < s_items.size(); i++)
     {
         s_items[i].name        = s_nameStorage[i].c_str();
@@ -222,4 +174,59 @@ bool TileRegistry_Load(const char* path)
     LogMsg("TileRegistry_Load: loaded %u items from '%s' (version %u).",
            itemCount, path, version);
     return true;
+}
+
+const TileType& GetTileType(TileTypeID id)
+{
+    static const TileType s_fallback = {};  // zero-init; used only if Load wasn't called
+    if (s_items.empty()) return s_fallback;
+    if ((size_t)id >= s_items.size()) return s_items[TILE_AIR];
+    return s_items[id];
+}
+
+Surface* GetTileSurface(TileTypeID id)
+{
+    if (s_items.empty()) return NULL;
+    if ((size_t)id >= s_items.size()) return NULL;
+    if (id == TILE_AIR) return NULL;
+
+    // Lazy-load: parallel-resize surface vectors on first call.
+    if (s_surfaces.size() != s_items.size())
+    {
+        s_surfaces.resize(s_items.size());
+        s_surfaceLoaded.assign(s_items.size(), false);
+    }
+
+    if (!s_surfaceLoaded[id])
+    {
+        const char* asset = s_items[id].asset;
+        if (asset && !s_surfaces[id].LoadFile(asset))
+        {
+            LogError("TileRegistry: failed to load asset '%s' for tile %d", asset, (int)id);
+        }
+        s_surfaceLoaded[id] = true;
+    }
+    return s_surfaces[id].IsLoaded() ? &s_surfaces[id] : NULL;
+}
+
+void TileRegistry_Shutdown()
+{
+    for (size_t i = 0; i < s_surfaces.size(); i++)
+    {
+        if (i < s_surfaceLoaded.size() && s_surfaceLoaded[i])
+        {
+            s_surfaces[i].Kill();
+        }
+    }
+    s_surfaces.clear();
+    s_surfaceLoaded.clear();
+    s_items.clear();
+    s_nameStorage.clear();
+    s_assetStorage.clear();
+    s_descStorage.clear();
+}
+
+size_t TileRegistry_GetCount()
+{
+    return s_items.size();
 }
