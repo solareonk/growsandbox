@@ -238,6 +238,38 @@ void AppInputRawKeyboard(VariantList *pVList)
             keyName = "L2";
             break;
 
+        // Phase 2: hotbar selection (digit keys 1-7).
+        // Windows raw keyboard delivers digit keys as ASCII codes ('1'..'7'),
+        // which are unchanged by ConvertWindowsKeycodeToProtonVirtualKey().
+        case '1':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetFist();
+            keyName = "1 (Fist)";
+            break;
+        case '2':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_GRASS);
+            keyName = "2 (Grass)";
+            break;
+        case '3':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_DIRT);
+            keyName = "3 (Dirt)";
+            break;
+        case '4':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_STONE);
+            keyName = "4 (Stone)";
+            break;
+        case '5':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_WOOD_PLANK);
+            keyName = "5 (Wood Plank)";
+            break;
+        case '6':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_CAVE_WALL);
+            keyName = "6 (Cave Wall)";
+            break;
+        case '7':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_WOOD_WALL);
+            keyName = "7 (Wood Wall)";
+            break;
+
 		case VIRTUAL_KEY_BACK:
 		keyName = "Escape";
 		GetApp()->OnExitApp(NULL);
@@ -452,10 +484,17 @@ void App::Draw()
 	// Debug overlay
 	CL_Vec2f pos = m_player.GetPosition();
 	CL_Vec2f vel = m_player.GetVelocity();
+
+	const char* selName = "FIST";
+	if (m_selection.GetKind() == Selection::BLOCK)
+	{
+		selName = GetTileType(m_selection.GetBlockType()).name;
+	}
+
 	char debugBuf[256];
 	snprintf(debugBuf, sizeof(debugBuf),
-		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d",
-		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0);
+		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d  Selected: %s",
+		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0, selName);
 	GetFont(FONT_SMALL)->Draw(10.0f, 10.0f, debugBuf);
 
 	// Base handles built-in GUI overlay (FPS counter, etc.)

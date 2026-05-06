@@ -11,11 +11,12 @@
 #include "Player.h"
 #include "Camera.h"
 #include "World.h"
+#include "Selection.h"
 
 class App: public BaseApp
 {
 public:
-	
+
 	App();
 	virtual ~App();
 	virtual bool Init();
@@ -27,11 +28,12 @@ public:
 	virtual bool OnPreInitVideo();
 	virtual void Update();
 	void OnExitApp(VariantList *pVarList);
-	
-	
+
+
 	//we'll wire these to connect to some signals we care about
 	void OnAccel(VariantList *pVList);
 	void OnArcadeInput(VariantList *pVList);
+	Selection& GetSelection() { return m_selection; }
 
 private:
 
@@ -48,6 +50,7 @@ private:
 	// Phase 2: tile world
 	World m_world;
 	bool m_worldGenerated;
+	Selection m_selection;
 };
 
 
