@@ -103,4 +103,18 @@ bool World::PunchAt(int x, int y)
     }
     return true;
 }
-bool World::PlaceAt(int x, int y, TileTypeID type) { return false; /* Task 10 */ }
+bool World::PlaceAt(int x, int y, TileTypeID type)
+{
+    if (!IsInBounds(x, y)) return false;
+    if (type == TILE_AIR || type == TILE_BEDROCK) return false;
+
+    const TileType& meta = GetTileType(type);
+    Cell& c = GetCell(x, y);
+    Tile& targetSlot = (meta.layer == TileType::FG_ONLY) ? c.fg : c.bg;
+
+    if (targetSlot.type != TILE_AIR) return false;     // slot occupied
+
+    targetSlot.type = type;
+    targetSlot.hp   = meta.maxHp;
+    return true;
+}

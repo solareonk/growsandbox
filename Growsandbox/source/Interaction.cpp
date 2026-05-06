@@ -49,7 +49,7 @@ void Interaction::Update(World& world,
     // 4. punch timer (used in Task 9 for rate-limit; tick now to be ready)
     m_punchTimer += dt;
 
-    // 5. dispatch — punch (Task 9) and place (Task 10)
+    // 5. dispatch — punch + place
     if (clickHeld && m_inReach && world.IsInBounds(cx, cy))
     {
         const float intervalSec = (float)PUNCH_INTERVAL_MS / 1000.0f;
@@ -62,12 +62,37 @@ void Interaction::Update(World& world,
                     m_punchTimer = 0.0f;
                 }
             }
-            // Selection::BLOCK handled in Task 10
+            else // Selection::BLOCK
+            {
+                TileTypeID t = selection.GetBlockType();
+                const TileType& meta = GetTileType(t);
+
+                // Self-squish guard: do not place an FG-solid block where it overlaps player AABB
+                bool wouldSquish = false;
+                if (meta.layer == TileType::FG_ONLY && meta.solid)
+                {
+                    const float TILE = (float)World::TILE_SIZE_PX;
+                    const float PLAYER_W = 32.0f;
+                    const float PLAYER_H = 48.0f;
+                    CL_Vec2f pp = player.GetPosition();
+                    float cellLeft   = (float)cx * TILE;
+                    float cellTop    = (float)cy * TILE;
+                    float cellRight  = cellLeft + TILE;
+                    float cellBottom = cellTop + TILE;
+                    bool overlapX = pp.x + PLAYER_W > cellLeft && pp.x < cellRight;
+                    bool overlapY = pp.y + PLAYER_H > cellTop  && pp.y < cellBottom;
+                    wouldSquish = overlapX && overlapY;
+                }
+
+                if (!wouldSquish && world.PlaceAt(cx, cy, t))
+                {
+                    m_punchTimer = 0.0f;
+                }
+            }
         }
     }
     else
     {
-        // Not clicking or out of reach — keep timer charged so the next click acts immediately
         const float intervalSec = (float)PUNCH_INTERVAL_MS / 1000.0f;
         if (m_punchTimer > intervalSec) m_punchTimer = intervalSec;
     }
