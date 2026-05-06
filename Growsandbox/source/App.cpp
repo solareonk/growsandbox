@@ -292,6 +292,10 @@ void AppInputRawKeyboard(VariantList *pVList)
             if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_WOOD_WALL);
             keyName = "7 (Wood Wall)";
             break;
+        case 'R':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetWorld().GenerateInitial();
+            keyName = "R (Reset)";
+            break;
 
 		case VIRTUAL_KEY_BACK:
 		keyName = "Escape";
