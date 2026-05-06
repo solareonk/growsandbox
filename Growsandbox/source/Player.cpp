@@ -10,6 +10,7 @@ static const float HEIGHT         = 48.0f;
 static const float GRAVITY        = 1500.0f;
 static const float MOVE_SPEED     = 300.0f;
 static const float JUMP_VELOCITY  = -550.0f;
+static const float MAX_FALL_SPEED = 1000.0f;  // terminal velocity — keeps dy/frame < TILE_SIZE_PX(36) at MAX_DELTA_TIME(1/30)
 static const float MAX_DELTA_TIME = 1.0f / 30.0f;
 
 // Phase 1.5b animation tuning
@@ -88,7 +89,7 @@ static void ResolveAxisY(CL_Vec2f& pos, CL_Vec2f& vel, bool& onGround, const Wor
 }
 
 Player::Player()
-    : m_position(50.0f * 36.0f, 24.0f * 36.0f)   // spawn col 50, row 24 = world (1800, 864)
+    : m_position(50.0f * 36.0f, 22.0f * 36.0f)   // spawn col 50, row 22 = world (1800, 792); falls ~60px onto grass row 25
     , m_velocity(0.0f, 0.0f)
     , m_onGround(false)
     , m_inputLeft(false)
@@ -138,6 +139,9 @@ void Player::Update(float deltaTime)
 
     // 3. Gravity
     m_velocity.y += GRAVITY * deltaTime;
+
+    // Clamp downward velocity to prevent AABB tunneling (single-resolve assumes dy < TILE)
+    if (m_velocity.y > MAX_FALL_SPEED) m_velocity.y = MAX_FALL_SPEED;
 
     // 4. Apply velocity per-axis with AABB collision against world
     m_position.x += m_velocity.x * deltaTime;
