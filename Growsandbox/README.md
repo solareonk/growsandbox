@@ -2,7 +2,7 @@
 
 A 2D side-view sandbox prototype built on [Proton SDK](https://github.com/SethRobinson/proton).
 
-**Status:** Phase 2 (Tile World) complete — punch/place mechanics working.
+**Status:** Phase 3a (Item Registry) complete — tile metadata loaded from binary `items.dat` via Python encoder pipeline.
 
 This is the very early foundation of a long-term hobby project — a 2D MMO sandbox in the spirit of *Growtopia*, with original IP and assets. Phase 2 builds on Phase 1's engine layer to deliver a real tile grid with destructible/placeable blocks.
 
@@ -29,9 +29,21 @@ This is the very early foundation of a long-term hobby project — a 2D MMO sand
 - ✅ Reset key (R) regenerates the world
 - ✅ Extended debug HUD with selection name, aim cell, and reach state
 
+## What Phase 3a Delivers
+
+- ✅ Tile metadata moved from compile-time `static const TileType s_tileTypes[]` to runtime-loaded `s_items` vector
+- ✅ Source-of-truth: `script/items.txt` (backslash-separated GT-style format, Git-tracked)
+- ✅ Python encoder: `script/encode_items.py` validates source + emits binary `bin/items.dat` (~381 bytes for 8 tiles)
+- ✅ Binary format: magic `"GSBX"` + u16 version + u32 itemCount + length-prefixed strings, little-endian
+- ✅ 9-field item schema (id, name, asset, layer, maxHp, solid, description, stackMax, breakable) — extends Phase 2's 6 fields
+- ✅ Strict version match validation — fail-fast on schema drift
+- ✅ Fail-fast `MessageBox` on missing/corrupt/version-mismatched `items.dat` with actionable instruction
+- ✅ Phase 2 verification matrix passes — zero behavior change
+
 ## Roadmap (Future Phases — Separate Specs)
 
-- **Phase 3** — Inventory & save persistence
+- **Phase 3b** — Inventory data structure + hotbar UI (depends on 3a item IDs)
+- **Phase 3c** — Save persistence for player + world state
 - **Phase 4** — Multiplayer networking via ENet
 - **Phase 5** — Multi-world hosting & accounts
 - **Phase 6+** — Game content, items, polish
