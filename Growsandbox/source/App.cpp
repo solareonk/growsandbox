@@ -281,46 +281,54 @@ void AppInputRawKeyboard(VariantList *pVList)
             keyName = "L2";
             break;
 
-        // Phase 2: hotbar selection (digit keys 1-7).
-        // Windows raw keyboard delivers digit keys as ASCII codes ('1'..'7'),
+        // Phase 3b: hotbar slot selection (keys 1-4) and backpack toggle (E).
+        // Windows raw keyboard delivers digit keys as ASCII codes ('1'..'4'),
         // which are unchanged by ConvertWindowsKeycodeToProtonVirtualKey().
         case '1':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetFist();
-            keyName = "1 (Fist)";
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(0);
+            keyName = "1 (slot 0)";
             break;
         case '2':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_GRASS);
-            keyName = "2 (Grass)";
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(1);
+            keyName = "2 (slot 1)";
             break;
         case '3':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_DIRT);
-            keyName = "3 (Dirt)";
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(2);
+            keyName = "3 (slot 2)";
             break;
         case '4':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_STONE);
-            keyName = "4 (Stone)";
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(3);
+            keyName = "4 (slot 3)";
             break;
-        case '5':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_WOOD_PLANK);
-            keyName = "5 (Wood Plank)";
-            break;
-        case '6':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_CAVE_WALL);
-            keyName = "6 (Cave Wall)";
-            break;
-        case '7':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_WOOD_WALL);
-            keyName = "7 (Wood Wall)";
+        case 'E':
+        case 'e':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().ToggleBackpack();
+            keyName = "E (backpack toggle)";
             break;
         case 'R':
-            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetWorld().GenerateInitial();
+        case 'r':
+            if (keyInfo == VIRTUAL_KEY_PRESS)
+            {
+                GetApp()->GetWorld().GenerateInitial();
+                GetApp()->GetInventory().Clear();   // Phase 3b: R also clears inventory
+            }
             keyName = "R (Reset)";
             break;
 
-		case VIRTUAL_KEY_BACK:
-		keyName = "Escape";
-		GetApp()->OnExitApp(NULL);
-		break;
+        case VIRTUAL_KEY_BACK:
+            keyName = "Escape";
+            if (keyInfo == VIRTUAL_KEY_PRESS)
+            {
+                if (GetApp()->GetInventory().IsBackpackOpen())
+                {
+                    GetApp()->GetInventory().CloseBackpack();
+                }
+                else
+                {
+                    GetApp()->OnExitApp(NULL);
+                }
+            }
+            break;
 
     }
     
@@ -348,12 +356,65 @@ void AppInput(VariantList *pVList)
 	{
 	
 	case MESSAGE_TYPE_GUI_CLICK_START:
+	{
 		GetApp()->SetMousePos(pt);
-		GetApp()->SetMouseDown(true);
+		App* app = GetApp();
+		Inventory& inv = app->GetInventory();
+
+		if (fingerID == 0)
+		{
+			// Left click
+			int mx = (int)pt.x;
+			int my = (int)pt.y;
+
+			// Hotbar always clickable
+			int hbIdx = app->HitTestHotbarSlot(mx, my);
+			if (hbIdx >= 0)
+			{
+				inv.SetSelectedHotbarSlot(hbIdx);
+				app->SetMouseDown(false);  // do NOT trigger world action
+				break;
+			}
+
+			if (inv.IsBackpackOpen())
+			{
+				int bpIdx = app->HitTestBackpackSlot(mx, my);
+				if (bpIdx >= 0)
+				{
+					inv.ClickBackpackSlot(bpIdx);
+				}
+				app->SetMouseDown(false);  // backpack open absorbs all world clicks
+				break;
+			}
+
+			// Backpack closed, no slot hit → world click (Phase 2 behavior)
+			app->SetMouseDown(true);
+		}
+		else
+		{
+			// Right click (fingerID == 1 on Windows)
+			int mx = (int)pt.x;
+			int my = (int)pt.y;
+			int hbIdx = app->HitTestHotbarSlot(mx, my);
+			if (hbIdx > 0)  // slot 0 (FIST) is index 0, skip
+			{
+				inv.RightClickHotbarSlot(hbIdx);
+			}
+		}
 		break;
+	}
 	case MESSAGE_TYPE_GUI_MOUSEWHEEL:
-		LogMsg("Mouse wheel: Offet: %.2f (Finger %d)", pVList->Get(4).GetVector2().x, fingerID);
+	{
+		// pVList->Get(4) is the wheel delta (positive = scroll up, negative = scroll down)
+		float delta = pVList->Get(4).GetFloat();
+		if (delta != 0.0f)
+		{
+			int dir = (delta > 0) ? -1 : 1;  // scroll up = previous slot
+			GetApp()->GetInventory().CycleSelected(dir);
+		}
+		LogMsg("Mouse wheel: delta %.2f", delta);
 		break;
+	}
 
 	case MESSAGE_TYPE_GUI_CLICK_MOVE_RAW:
 		GetApp()->SetMousePos(pt);
@@ -439,8 +500,11 @@ void App::Update()
 	m_camera.SetTarget(m_player.GetPosition());
 	m_camera.Update(dt);
 
-	m_interaction.Update(m_world, m_player, m_camera,
-	                     m_mousePos, m_mouseDown, m_selection, dt);
+	if (!m_inventory.IsBackpackOpen())
+	{
+		m_interaction.Update(m_world, m_player, m_camera,
+		                     m_mousePos, m_mouseDown, m_inventory, dt);
+	}
 
 	m_inputJump = false;  // consume edge-trigger after Player has read it
 
@@ -602,11 +666,8 @@ void App::Draw()
 	CL_Vec2f pos = m_player.GetPosition();
 	CL_Vec2f vel = m_player.GetVelocity();
 
-	const char* selName = "FIST";
-	if (m_selection.GetKind() == Selection::BLOCK)
-	{
-		selName = GetTileType(m_selection.GetBlockType()).name;
-	}
+	// Phase 3b: show selected item from Inventory
+	const char* selName = m_inventory.IsFistSelected() ? "FIST" : GetTileType(m_inventory.GetSelectedTile()).name;
 
 	char debugBuf[256];
 	snprintf(debugBuf, sizeof(debugBuf),
@@ -656,6 +717,35 @@ const char * GetBundleName()
 	const char * bundleName = "Growsandbox";
 	return bundleName;
 }
+
+int App::HitTestHotbarSlot(int mx, int my)
+{
+    const int SLOT_SIZE   = 48;
+    const int HOTBAR_X    = (1024 - 4 * SLOT_SIZE) / 2;  // 416
+    const int HOTBAR_Y    = 768 - 12 - SLOT_SIZE;        // 708
+    if (my < HOTBAR_Y || my >= HOTBAR_Y + SLOT_SIZE) return -1;
+    if (mx < HOTBAR_X || mx >= HOTBAR_X + 4 * SLOT_SIZE) return -1;
+    return (mx - HOTBAR_X) / SLOT_SIZE;
+}
+
+int App::HitTestBackpackSlot(int mx, int my)
+{
+    if (!m_inventory.IsBackpackOpen()) return -1;
+    const int SLOT_SIZE = 48;
+    const int BP_X      = (1024 - 10 * SLOT_SIZE) / 2;  // 272
+    const int TITLE_H   = 24;
+    const int BP_Y      = 708 - 12 - (3 * SLOT_SIZE + TITLE_H);  // 528
+    int gridY = BP_Y + TITLE_H;
+    if (my < gridY || my >= gridY + 3 * SLOT_SIZE) return -1;
+    if (mx < BP_X || mx >= BP_X + 10 * SLOT_SIZE) return -1;
+    int col = (mx - BP_X) / SLOT_SIZE;
+    int row = (my - gridY) / SLOT_SIZE;
+    return row * 10 + col;
+}
+
+// Stubs for Tasks 6-7. Empty bodies keep this task's build clean.
+void App::DrawHotbar() {}
+void App::DrawBackpack() {}
 
 bool App::OnPreInitVideo()
 {
