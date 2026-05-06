@@ -28,6 +28,18 @@ AudioManager * GetAudioManager(){return &g_audioManager;}
 bool g_bIsFullScreen = false;
 #endif
 
+// Phase 3a: Show a Windows MessageBox for fatal init errors.
+// Keeps the failure message visible even if console is hidden.
+static void ShowFatalError(const char* msg)
+{
+	LogError("FATAL: %s", msg);
+#ifdef _WIN32
+	MessageBoxA(NULL, msg, "Growsandbox - Fatal Error", MB_ICONERROR | MB_OK);
+#else
+	fprintf(stderr, "FATAL: %s\n", msg);
+#endif
+}
+
 App *g_pApp = NULL;
 
 static Surface g_crackOverlay;
@@ -101,6 +113,14 @@ bool App::Init()
 	//fonts need zlib to decompress.  When porting a new platform I define C_NO_ZLIB and add zlib support later sometimes
 	if (!GetFont(FONT_SMALL)->Load("interface/font_trajan.rtfont")) return false;
 #endif
+
+	if (!TileRegistry_Load("items.dat"))
+	{
+		ShowFatalError("Failed to load items.dat.\n\n"
+		               "Run: py script/encode_items.py\n"
+		               "Then re-launch.");
+		return false;
+	}
 
 	GetBaseApp()->SetFPSVisible(true);
 	return true;
