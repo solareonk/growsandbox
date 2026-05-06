@@ -394,6 +394,9 @@ void App::Update()
 	m_camera.SetTarget(m_player.GetPosition());
 	m_camera.Update(dt);
 
+	m_interaction.Update(m_world, m_player, m_camera,
+	                     m_mousePos, m_mouseDown, m_selection, dt);
+
 	m_inputJump = false;  // consume edge-trigger after Player has read it
 
 	//game is thinking.
@@ -485,6 +488,27 @@ void App::Draw()
 	// Player — delegates to Player::Draw which uses camera transform
 	m_player.Draw(m_camera);
 
+	// Phase 2: aim outline
+	if (m_interaction.HasAim())
+	{
+		int cx = m_interaction.GetAimX();
+		int cy = m_interaction.GetAimY();
+		const float TILE = (float)World::TILE_SIZE_PX;
+
+		CL_Vec2f cellWorld = World::CellToWorld(cx, cy);
+		CL_Vec2f cellScreen = m_camera.WorldToScreen(cellWorld);
+
+		uint32 color = m_interaction.IsAimInReach()
+		    ? MAKE_RGBA(255, 255, 255, 200)
+		    : MAKE_RGBA(255, 60, 60, 200);
+
+		// Draw outline as 4 thin filled rects (1 px borders)
+		DrawFilledRect(cellScreen.x, cellScreen.y, TILE, 1.0f, color);
+		DrawFilledRect(cellScreen.x, cellScreen.y + TILE - 1.0f, TILE, 1.0f, color);
+		DrawFilledRect(cellScreen.x, cellScreen.y, 1.0f, TILE, color);
+		DrawFilledRect(cellScreen.x + TILE - 1.0f, cellScreen.y, 1.0f, TILE, color);
+	}
+
 	// Debug overlay
 	CL_Vec2f pos = m_player.GetPosition();
 	CL_Vec2f vel = m_player.GetVelocity();
@@ -497,8 +521,10 @@ void App::Draw()
 
 	char debugBuf[256];
 	snprintf(debugBuf, sizeof(debugBuf),
-		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d  Selected: %s",
-		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0, selName);
+		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d  Selected: %s  Aim: (%d, %d) %s",
+		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0, selName,
+		m_interaction.GetAimX(), m_interaction.GetAimY(),
+		m_interaction.IsAimInReach() ? "REACH" : "OUT");
 	GetFont(FONT_SMALL)->Draw(10.0f, 10.0f, debugBuf);
 
 	// Base handles built-in GUI overlay (FPS counter, etc.)

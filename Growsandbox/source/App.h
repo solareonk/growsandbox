@@ -12,6 +12,7 @@
 #include "Camera.h"
 #include "World.h"
 #include "Selection.h"
+#include "Interaction.h"
 
 class App: public BaseApp
 {
@@ -53,6 +54,7 @@ private:
 	World m_world;
 	bool m_worldGenerated;
 	Selection m_selection;
+	Interaction m_interaction;
 
 	// Phase 2: mouse state
 	CL_Vec2f m_mousePos;
