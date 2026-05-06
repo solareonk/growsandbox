@@ -2,14 +2,14 @@
 #include "TileRegistry.h"
 
 static const TileType s_tileTypes[TILE_TYPE_COUNT] = {
-    { TILE_AIR,        "air",        NULL,                    TileType::FG_ONLY, 0, false },
-    { TILE_GRASS,      "grass",      "tile_grass.rttex",      TileType::FG_ONLY, 3, true  },
-    { TILE_DIRT,       "dirt",       "tile_dirt.rttex",       TileType::FG_ONLY, 3, true  },
-    { TILE_STONE,      "stone",      "tile_stone.rttex",      TileType::FG_ONLY, 6, true  },
-    { TILE_WOOD_PLANK, "wood_plank", "tile_wood_plank.rttex", TileType::FG_ONLY, 4, true  },
-    { TILE_CAVE_WALL,  "cave_wall",  "tile_cave_wall.rttex",  TileType::BG_ONLY, 2, false },
-    { TILE_WOOD_WALL,  "wood_wall",  "tile_wood_wall.rttex",  TileType::BG_ONLY, 2, false },
-    { TILE_BEDROCK,    "bedrock",    "tile_bedrock.rttex",    TileType::FG_ONLY, 0, true  }
+    { TILE_AIR,        "air",        NULL,                    TileType::FG_ONLY, 0, false, "Empty space.",       0,   false },
+    { TILE_GRASS,      "grass",      "tile_grass.rttex",      TileType::FG_ONLY, 3, true,  "Soft and green.",    999, true  },
+    { TILE_DIRT,       "dirt",       "tile_dirt.rttex",       TileType::FG_ONLY, 3, true,  "Plain dirt.",        999, true  },
+    { TILE_STONE,      "stone",      "tile_stone.rttex",      TileType::FG_ONLY, 6, true,  "Tough stuff.",       999, true  },
+    { TILE_WOOD_PLANK, "wood_plank", "tile_wood_plank.rttex", TileType::FG_ONLY, 4, true,  "Sturdy planks.",     999, true  },
+    { TILE_CAVE_WALL,  "cave_wall",  "tile_cave_wall.rttex",  TileType::BG_ONLY, 2, false, "Background wall.",   999, true  },
+    { TILE_WOOD_WALL,  "wood_wall",  "tile_wood_wall.rttex",  TileType::BG_ONLY, 2, false, "Wooden background.", 999, true  },
+    { TILE_BEDROCK,    "bedrock",    "tile_bedrock.rttex",    TileType::FG_ONLY, 0, true,  "Indestructible.",    0,   false }
 };
 
 // Lazy-loaded surfaces, parallel to s_tileTypes by index

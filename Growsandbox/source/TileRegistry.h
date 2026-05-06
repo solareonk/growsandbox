@@ -23,6 +23,9 @@ struct TileType
     LayerEligibility layer;
     uint8_t     maxHp;
     bool        solid;
+    const char* description;  // Phase 3a: UI dialog text (Phase 6+ usage)
+    uint16_t    stackMax;     // Phase 3a: inventory cap (0 = not stackable)
+    bool        breakable;    // Phase 3a: false = punch ignored (bedrock)
 };
 
 const TileType& GetTileType(TileTypeID id);
