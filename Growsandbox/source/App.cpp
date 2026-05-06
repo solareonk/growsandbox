@@ -663,6 +663,7 @@ void App::Draw()
 	}
 
 	DrawHotbar();
+	DrawBackpack();
 
 	// Debug overlay
 	CL_Vec2f pos = m_player.GetPosition();
@@ -814,7 +815,73 @@ void App::DrawHotbar()
         }
     }
 }
-void App::DrawBackpack() {}
+void App::DrawBackpack()
+{
+    if (!m_inventory.IsBackpackOpen()) return;
+
+    const int SLOT_SIZE = 48;
+    const int BP_X      = (1024 - 10 * SLOT_SIZE) / 2;  // 272
+    const int TITLE_H   = 24;
+    const int BP_Y      = 708 - 12 - (3 * SLOT_SIZE + TITLE_H);  // 528
+    const int GRID_Y    = BP_Y + TITLE_H;
+    const int PANEL_W   = 10 * SLOT_SIZE;
+    const int PANEL_H   = TITLE_H + 3 * SLOT_SIZE;
+
+    // Background panel
+    DrawFilledRect((float)(BP_X - 4), (float)(BP_Y - 4),
+                   (float)(PANEL_W + 8), (float)(PANEL_H + 8),
+                   MAKE_RGBA(0, 0, 0, 200));
+
+    // Title bar
+    DrawFilledRect((float)BP_X, (float)BP_Y,
+                   (float)PANEL_W, (float)TITLE_H,
+                   MAKE_RGBA(60, 60, 80, 240));
+    GetFont(FONT_SMALL)->Draw((float)(BP_X + 8), (float)(BP_Y + 6), "Backpack");
+    GetFont(FONT_SMALL)->Draw((float)(BP_X + PANEL_W - 110), (float)(BP_Y + 6), "(E to close)");
+
+    // Slot grid
+    for (int row = 0; row < Inventory::BACKPACK_ROWS; row++)
+    {
+        for (int col = 0; col < Inventory::BACKPACK_COLS; col++)
+        {
+            int idx = row * Inventory::BACKPACK_COLS + col;
+            int sx = BP_X + col * SLOT_SIZE;
+            int sy = GRID_Y + row * SLOT_SIZE;
+
+            // Slot background
+            DrawFilledRect((float)sx, (float)sy,
+                           (float)SLOT_SIZE, (float)SLOT_SIZE,
+                           MAKE_RGBA(40, 40, 40, 200));
+
+            // Slot border (1-px)
+            DrawFilledRect((float)sx, (float)sy, (float)SLOT_SIZE, 1.0f, MAKE_RGBA(80, 80, 80, 255));
+            DrawFilledRect((float)sx, (float)(sy + SLOT_SIZE - 1), (float)SLOT_SIZE, 1.0f, MAKE_RGBA(80, 80, 80, 255));
+            DrawFilledRect((float)sx, (float)sy, 1.0f, (float)SLOT_SIZE, MAKE_RGBA(80, 80, 80, 255));
+            DrawFilledRect((float)(sx + SLOT_SIZE - 1), (float)sy, 1.0f, (float)SLOT_SIZE, MAKE_RGBA(80, 80, 80, 255));
+
+            // Slot content
+            const InventorySlot& s = m_inventory.GetBackpackSlot(idx);
+            if (s.type != TILE_AIR && s.count > 0)
+            {
+                Surface* surf = GetTileSurface(s.type);
+                if (surf)
+                {
+                    rtRectf dst((float)(sx + 8), (float)(sy + 8),
+                                (float)(sx + 8 + 32), (float)(sy + 8 + 32));
+                    rtRectf src(0.0f, 0.0f, (float)surf->GetWidth(), (float)surf->GetHeight());
+                    surf->BlitEx(dst, src);
+                }
+                else
+                {
+                    DrawFilledRect((float)(sx + 8), (float)(sy + 8), 32.0f, 32.0f, MAKE_RGBA(255, 0, 255, 255));
+                }
+                char countBuf[8];
+                snprintf(countBuf, sizeof(countBuf), "%d", (int)s.count);
+                GetFont(FONT_SMALL)->Draw((float)(sx + SLOT_SIZE - 18), (float)(sy + SLOT_SIZE - 14), countBuf);
+            }
+        }
+    }
+}
 
 bool App::OnPreInitVideo()
 {
