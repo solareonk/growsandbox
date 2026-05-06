@@ -1,0 +1,14 @@
+//Growsandbox Item Registry
+//Format: add_item\id\name\asset\layer\maxHp\solid\description\stack_max\breakable
+
+version\1
+itemCount\8
+
+add_item\0\air\\FG\0\0\Empty space.\0\0
+add_item\1\grass\tile_grass.rttex\FG\3\1\Soft and green.\999\1
+add_item\2\dirt\tile_dirt.rttex\FG\3\1\Plain dirt.\999\1
+add_item\3\stone\tile_stone.rttex\FG\6\1\Tough stuff.\999\1
+add_item\4\wood_plank\tile_wood_plank.rttex\FG\4\1\Sturdy planks.\999\1
+add_item\5\cave_wall\tile_cave_wall.rttex\BG\2\0\Background wall.\999\1
+add_item\6\wood_wall\tile_wood_wall.rttex\BG\2\0\Wooden background.\999\1
+add_item\7\bedrock\tile_bedrock.rttex\FG\0\1\Indestructible.\0\0
