@@ -342,6 +342,13 @@ void App::Update()
 
 	}
 
+	if (!m_worldGenerated)
+	{
+		m_world.GenerateInitial();
+		m_player.SetWorld(&m_world);
+		m_worldGenerated = true;
+	}
+
 	// Phase 1: Drive Player + Camera per frame
 	float dt = GetBaseApp()->GetElapsedTime();  // delta in seconds
 
@@ -366,12 +373,6 @@ void App::Draw()
 	CLEAR_GL_ERRORS()
 
 	// Phase 2: render World grid (BG + FG layers, camera-culled)
-	if (!m_worldGenerated)
-	{
-		m_world.GenerateInitial();
-		m_worldGenerated = true;
-	}
-
 	{
 		const float TILE = (float)World::TILE_SIZE_PX;
 		CL_Vec2f camPos = m_camera.GetPosition();
