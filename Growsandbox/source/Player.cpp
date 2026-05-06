@@ -1,14 +1,16 @@
 #include "PlatformPrecomp.h"
 #include "Player.h"
 #include "Camera.h"
+#include "World.h"
+#include <cmath>
 
 // Tuning constants per spec — adjust during playtesting.
-static const float WIDTH          = 32.0f;
-static const float HEIGHT         = 48.0f;
+static const float WIDTH          = Player::HITBOX_WIDTH;
+static const float HEIGHT         = Player::HITBOX_HEIGHT;
 static const float GRAVITY        = 1500.0f;
 static const float MOVE_SPEED     = 300.0f;
 static const float JUMP_VELOCITY  = -550.0f;
-static const float GROUND_Y       = 500.0f;
+static const float MAX_FALL_SPEED = 1000.0f;  // terminal velocity — keeps dy/frame < TILE_SIZE_PX(36) at MAX_DELTA_TIME(1/30)
 static const float MAX_DELTA_TIME = 1.0f / 30.0f;
 
 // Phase 1.5b animation tuning
@@ -17,8 +19,81 @@ static const float WALK_FRAME_DURATION = 0.15f;  // seconds per walk frame
 // Scale factor to fit roughly within hitbox visually (slightly larger looks better).
 static const float SPRITE_SCALE = 0.6f;          // sprite renders at ~48x66 px
 
+// Push player out of FG-solid tiles after moving on X axis.
+// Resolves at most one overlap per call (sufficient if dt is capped).
+static void ResolveAxisX(CL_Vec2f& pos, CL_Vec2f& vel, const World* world)
+{
+    if (!world) return;
+    const float TILE = (float)World::TILE_SIZE_PX;
+
+    // Note: cellMax uses (pos + size) without -1 so a player AABB that's barely
+    // overlapping a tile by sub-pixel still includes that tile in the iteration.
+    // The inner per-tile overlap check handles touching-edge cases (no false positive).
+    int cellMinX = (int)std::floor( pos.x              / TILE);
+    int cellMaxX = (int)std::floor((pos.x + WIDTH)     / TILE);
+    int cellMinY = (int)std::floor( pos.y              / TILE);
+    int cellMaxY = (int)std::floor((pos.y + HEIGHT)    / TILE);
+
+    for (int cy = cellMinY; cy <= cellMaxY; cy++)
+    {
+        for (int cx = cellMinX; cx <= cellMaxX; cx++)
+        {
+            if (!world->IsSolidAt(cx, cy)) continue;
+            float tileLeft   = cx       * TILE;
+            float tileRight  = (cx + 1) * TILE;
+
+            if (pos.x + WIDTH <= tileLeft || pos.x >= tileRight) continue;
+            if (pos.y + HEIGHT <= cy * TILE || pos.y >= (cy + 1) * TILE) continue;
+
+            if (vel.x > 0.0f)      pos.x = tileLeft  - WIDTH;
+            else if (vel.x < 0.0f) pos.x = tileRight;
+            vel.x = 0.0f;
+            return;
+        }
+    }
+}
+
+// Push player out of FG-solid tiles after moving on Y axis.
+// Sets m_onGround = true if landing from above.
+static void ResolveAxisY(CL_Vec2f& pos, CL_Vec2f& vel, bool& onGround, const World* world)
+{
+    if (!world) return;
+    const float TILE = (float)World::TILE_SIZE_PX;
+
+    // See ResolveAxisX comment — cellMax uses (pos + size) without -1.
+    int cellMinX = (int)std::floor( pos.x              / TILE);
+    int cellMaxX = (int)std::floor((pos.x + WIDTH)     / TILE);
+    int cellMinY = (int)std::floor( pos.y              / TILE);
+    int cellMaxY = (int)std::floor((pos.y + HEIGHT)    / TILE);
+
+    for (int cy = cellMinY; cy <= cellMaxY; cy++)
+    {
+        for (int cx = cellMinX; cx <= cellMaxX; cx++)
+        {
+            if (!world->IsSolidAt(cx, cy)) continue;
+            float tileTop    = cy       * TILE;
+            float tileBottom = (cy + 1) * TILE;
+
+            if (pos.x + WIDTH <= cx * TILE || pos.x >= (cx + 1) * TILE) continue;
+            if (pos.y + HEIGHT <= tileTop || pos.y >= tileBottom) continue;
+
+            if (vel.y > 0.0f)
+            {
+                pos.y = tileTop - HEIGHT;
+                onGround = true;
+            }
+            else if (vel.y < 0.0f)
+            {
+                pos.y = tileBottom;
+            }
+            vel.y = 0.0f;
+            return;
+        }
+    }
+}
+
 Player::Player()
-    : m_position(100.0f, 100.0f)
+    : m_position(50.0f * 36.0f, 22.0f * 36.0f)   // spawn col 50, row 22 = world (1800, 792); falls ~60px onto grass row 25
     , m_velocity(0.0f, 0.0f)
     , m_onGround(false)
     , m_inputLeft(false)
@@ -28,6 +103,7 @@ Player::Player()
     , m_facingRight(true)
     , m_walkAnimTimer(0.0f)
     , m_walkFrameToggle(false)
+    , m_pWorld(NULL)
 {
 }
 
@@ -68,22 +144,16 @@ void Player::Update(float deltaTime)
     // 3. Gravity
     m_velocity.y += GRAVITY * deltaTime;
 
-    // 4. Apply velocity to position
-    m_position.x += m_velocity.x * deltaTime;
-    m_position.y += m_velocity.y * deltaTime;
+    // Clamp downward velocity to prevent AABB tunneling (single-resolve assumes dy < TILE)
+    if (m_velocity.y > MAX_FALL_SPEED) m_velocity.y = MAX_FALL_SPEED;
 
-    // 5. Ground collision
-    float feetY = m_position.y + HEIGHT;
-    if (feetY >= GROUND_Y)
-    {
-        m_position.y = GROUND_Y - HEIGHT;
-        m_velocity.y = 0.0f;
-        m_onGround = true;
-    }
-    else
-    {
-        m_onGround = false;
-    }
+    // 4. Apply velocity per-axis with AABB collision against world
+    m_position.x += m_velocity.x * deltaTime;
+    ResolveAxisX(m_position, m_velocity, m_pWorld);
+
+    m_position.y += m_velocity.y * deltaTime;
+    m_onGround = false;
+    ResolveAxisY(m_position, m_velocity, m_onGround, m_pWorld);
 
     // 6. Walk animation timer cycling
     if (m_onGround && m_velocity.x != 0.0f)

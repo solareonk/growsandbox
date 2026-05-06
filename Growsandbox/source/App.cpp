@@ -6,6 +6,7 @@
  */ 
 #include "PlatformPrecomp.h"
 #include "App.h"
+#include "TileRegistry.h"
 #include "Entity/CustomInputComponent.h" //used for the back button (android)
 #include "Entity/FocusInputComponent.h" //needed to let the input component see input messages
 #include "Entity/ArcadeInputComponent.h"
@@ -29,7 +30,11 @@ bool g_bIsFullScreen = false;
 
 App *g_pApp = NULL;
 
-BaseApp * GetBaseApp() 
+static Surface g_crackOverlay;
+static bool    g_crackOverlayLoaded = false;
+static bool    g_crackOverlayTried  = false;
+
+BaseApp * GetBaseApp()
 {
 	if (!g_pApp)
 	{
@@ -38,10 +43,21 @@ BaseApp * GetBaseApp()
 	return g_pApp;
 }
 
-App * GetApp() 
+App * GetApp()
 {
 	assert(g_pApp && "GetBaseApp must be called used first");
 	return g_pApp;
+}
+
+static Surface* GetCrackOverlay()
+{
+	if (!g_crackOverlayTried)
+	{
+		g_crackOverlay.LoadFile("crack_overlay.rttex");
+		g_crackOverlayLoaded = g_crackOverlay.IsLoaded();
+		g_crackOverlayTried = true;
+	}
+	return g_crackOverlayLoaded ? &g_crackOverlay : NULL;
 }
 
 App::App()
@@ -49,7 +65,9 @@ App::App()
 	, m_inputLeft(false)
 	, m_inputRight(false)
 	, m_inputJump(false)
-	, m_tilesLoaded(false)
+	, m_worldGenerated(false)
+	, m_mousePos(0.0f, 0.0f)
+	, m_mouseDown(false)
 {
 }
 
@@ -90,6 +108,13 @@ bool App::Init()
 
 void App::Kill()
 {
+	TileRegistry_Shutdown();
+	if (g_crackOverlayLoaded)
+	{
+		g_crackOverlay.Kill();
+		g_crackOverlayLoaded = false;
+		g_crackOverlayTried = false;
+	}
 	BaseApp::Kill();
 }
 
@@ -236,6 +261,42 @@ void AppInputRawKeyboard(VariantList *pVList)
             keyName = "L2";
             break;
 
+        // Phase 2: hotbar selection (digit keys 1-7).
+        // Windows raw keyboard delivers digit keys as ASCII codes ('1'..'7'),
+        // which are unchanged by ConvertWindowsKeycodeToProtonVirtualKey().
+        case '1':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetFist();
+            keyName = "1 (Fist)";
+            break;
+        case '2':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_GRASS);
+            keyName = "2 (Grass)";
+            break;
+        case '3':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_DIRT);
+            keyName = "3 (Dirt)";
+            break;
+        case '4':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_STONE);
+            keyName = "4 (Stone)";
+            break;
+        case '5':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_WOOD_PLANK);
+            keyName = "5 (Wood Plank)";
+            break;
+        case '6':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_CAVE_WALL);
+            keyName = "6 (Cave Wall)";
+            break;
+        case '7':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetSelection().SetBlock(TILE_WOOD_WALL);
+            keyName = "7 (Wood Wall)";
+            break;
+        case 'R':
+            if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetWorld().GenerateInitial();
+            keyName = "R (Reset)";
+            break;
+
 		case VIRTUAL_KEY_BACK:
 		keyName = "Escape";
 		GetApp()->OnExitApp(NULL);
@@ -267,17 +328,19 @@ void AppInput(VariantList *pVList)
 	{
 	
 	case MESSAGE_TYPE_GUI_CLICK_START:
-		LogMsg("Touch start: X: %.2f Y: %.2f (Finger %d)", pt.x, pt.y, fingerID);
+		GetApp()->SetMousePos(pt);
+		GetApp()->SetMouseDown(true);
 		break;
 	case MESSAGE_TYPE_GUI_MOUSEWHEEL:
 		LogMsg("Mouse wheel: Offet: %.2f (Finger %d)", pVList->Get(4).GetVector2().x, fingerID);
 		break;
 
 	case MESSAGE_TYPE_GUI_CLICK_MOVE_RAW:
-		//LogMsg("Touch raw move: X: %.2f YL %.2f (Finger %d)", pt.x, pt.y, fingerID);
+		GetApp()->SetMousePos(pt);
 		break;
 	case MESSAGE_TYPE_GUI_CLICK_END:
-		LogMsg("Touch end: X: %.2f Y: %.2f (Finger %d)", pt.x, pt.y, fingerID);
+		GetApp()->SetMousePos(pt);
+		GetApp()->SetMouseDown(false);
 		break;
 
 	case MESSAGE_TYPE_GUI_CHAR:
@@ -340,6 +403,13 @@ void App::Update()
 
 	}
 
+	if (!m_worldGenerated)
+	{
+		m_world.GenerateInitial();
+		m_player.SetWorld(&m_world);
+		m_worldGenerated = true;
+	}
+
 	// Phase 1: Drive Player + Camera per frame
 	float dt = GetBaseApp()->GetElapsedTime();  // delta in seconds
 
@@ -348,6 +418,9 @@ void App::Update()
 
 	m_camera.SetTarget(m_player.GetPosition());
 	m_camera.Update(dt);
+
+	m_interaction.Update(m_world, m_player, m_camera,
+	                     m_mousePos, m_mouseDown, m_selection, dt);
 
 	m_inputJump = false;  // consume edge-trigger after Player has read it
 
@@ -363,63 +436,120 @@ void App::Draw()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	CLEAR_GL_ERRORS()
 
-	// Ground — tiled with Kenney pixel-platformer tiles
-	if (!m_tilesLoaded)
+	// Phase 2: render World grid (BG + FG layers, camera-culled)
 	{
-		m_tileGrass.LoadFile("tile_grass.rttex");
-		m_tileDirt.LoadFile("tile_dirt.rttex");
-		m_tilesLoaded = true;
-	}
-
-	if (m_tileGrass.IsLoaded() && m_tileDirt.IsLoaded())
-	{
-		const float TILE_SIZE = 36.0f;        // 18x18 native scaled 2x
-		const float GROUND_Y_WORLD = 500.0f;  // matches Player::GROUND_Y
-
-		// Native sprite size for sampling
-		float texW = (float)m_tileGrass.GetWidth();
-		float texH = (float)m_tileGrass.GetHeight();
-		rtRectf srcRect(0.0f, 0.0f, texW, texH);
-
-		// Determine which world X column the camera leftmost screen edge is at
+		const float TILE = (float)World::TILE_SIZE_PX;
 		CL_Vec2f camPos = m_camera.GetPosition();
 		float screenW = GetScreenSizeXf();
 		float screenH = GetScreenSizeYf();
 
-		float worldLeft = camPos.x - screenW * 0.5f;
+		float worldLeft  = camPos.x - screenW * 0.5f;
 		float worldRight = camPos.x + screenW * 0.5f;
+		float worldTop   = camPos.y - screenH * 0.5f;
+		float worldBot   = camPos.y + screenH * 0.5f;
 
-		// Snap to tile grid: first tile column visible
-		int firstCol = (int)std::floor(worldLeft / TILE_SIZE) - 1;  // -1 buffer
-		int lastCol  = (int)std::floor(worldRight / TILE_SIZE) + 1;
+		int firstCol = (int)std::floor(worldLeft  / TILE) - 1;
+		int lastCol  = (int)std::floor(worldRight / TILE) + 1;
+		int firstRow = (int)std::floor(worldTop   / TILE) - 1;
+		int lastRow  = (int)std::floor(worldBot   / TILE) + 1;
 
-		// Number of dirt rows below the grass surface (enough to cover bottom of screen)
-		int dirtRows = (int)std::ceil((screenH * 0.5f + (screenH * 0.5f - GROUND_Y_WORLD + camPos.y)) / TILE_SIZE) + 2;
-		if (dirtRows < 8) dirtRows = 8;  // floor: at least 8 rows worth of dirt below
+		if (firstCol < 0) firstCol = 0;
+		if (lastCol  >= World::WIDTH)  lastCol  = World::WIDTH  - 1;
+		if (firstRow < 0) firstRow = 0;
+		if (lastRow  >= World::HEIGHT) lastRow  = World::HEIGHT - 1;
 
-		for (int col = firstCol; col <= lastCol; col++)
+		for (int y = firstRow; y <= lastRow; y++)
 		{
-			float worldX = col * TILE_SIZE;
-
-			// Surface tile (grass) at top
-			CL_Vec2f surfaceWorldPos(worldX, GROUND_Y_WORLD);
-			CL_Vec2f surfaceScreenPos = m_camera.WorldToScreen(surfaceWorldPos);
-			rtRectf dstSurface(
-				surfaceScreenPos.x, surfaceScreenPos.y,
-				surfaceScreenPos.x + TILE_SIZE, surfaceScreenPos.y + TILE_SIZE
-			);
-			m_tileGrass.BlitEx(dstSurface, srcRect);
-
-			// Dirt fill rows below
-			for (int row = 1; row <= dirtRows; row++)
+			for (int x = firstCol; x <= lastCol; x++)
 			{
-				CL_Vec2f dirtWorldPos(worldX, GROUND_Y_WORLD + row * TILE_SIZE);
-				CL_Vec2f dirtScreenPos = m_camera.WorldToScreen(dirtWorldPos);
-				rtRectf dstDirt(
-					dirtScreenPos.x, dirtScreenPos.y,
-					dirtScreenPos.x + TILE_SIZE, dirtScreenPos.y + TILE_SIZE
-				);
-				m_tileDirt.BlitEx(dstDirt, srcRect);
+				const Cell& c = m_world.GetCell(x, y);
+				CL_Vec2f cellWorld = World::CellToWorld(x, y);
+				CL_Vec2f cellScreen = m_camera.WorldToScreen(cellWorld);
+				rtRectf dst(cellScreen.x, cellScreen.y,
+				            cellScreen.x + TILE, cellScreen.y + TILE);
+
+				// 1. BG layer (rendered first, darkened by overlay below)
+				if (c.bg.type != TILE_AIR)
+				{
+					Surface* bgSurf = GetTileSurface(c.bg.type);
+					if (bgSurf)
+					{
+						rtRectf src(0.0f, 0.0f, (float)bgSurf->GetWidth(), (float)bgSurf->GetHeight());
+						bgSurf->BlitEx(dst, src);
+						// Darken pass — translucent black overlay (~30% darken)
+						DrawFilledRect(dst.left, dst.top,
+						               dst.right - dst.left, dst.bottom - dst.top,
+						               MAKE_RGBA(0, 0, 0, 80));
+					}
+					else
+					{
+						// Fallback: dark gray rect if asset missing
+						DrawFilledRect(dst.left, dst.top, TILE, TILE, MAKE_RGBA(60, 60, 60, 255));
+					}
+				}
+
+				// 2. FG layer (drawn on top)
+				if (c.fg.type != TILE_AIR)
+				{
+					Surface* fgSurf = GetTileSurface(c.fg.type);
+					if (fgSurf)
+					{
+						rtRectf src(0.0f, 0.0f, (float)fgSurf->GetWidth(), (float)fgSurf->GetHeight());
+						fgSurf->BlitEx(dst, src);
+					}
+					else
+					{
+						// Fallback per type — bedrock gray, others magenta (visible "missing")
+						uint32 color = (c.fg.type == TILE_BEDROCK)
+						    ? MAKE_RGBA(50, 50, 50, 255)
+						    : MAKE_RGBA(255, 0, 255, 255);
+						DrawFilledRect(dst.left, dst.top, TILE, TILE, color);
+					}
+				}
+
+				// Crack overlay — render on whichever layer (FG or BG) is being damaged
+				const Tile* damaged = NULL;
+				if (c.fg.type != TILE_AIR)
+				{
+					const TileType& fgMeta = GetTileType(c.fg.type);
+					if (fgMeta.maxHp > 0 && c.fg.hp < fgMeta.maxHp)
+					{
+						damaged = &c.fg;
+					}
+				}
+				else if (c.bg.type != TILE_AIR)
+				{
+					const TileType& bgMeta = GetTileType(c.bg.type);
+					if (bgMeta.maxHp > 0 && c.bg.hp < bgMeta.maxHp)
+					{
+						damaged = &c.bg;
+					}
+				}
+
+				if (damaged)
+				{
+					const TileType& meta = GetTileType(damaged->type);
+					// hp range 0..maxHp; stage range 1..4 (skip 0 = uncracked)
+					int stage = 4 - (int)((float)damaged->hp / (float)meta.maxHp * 4.0f);
+					if (stage < 1) stage = 1;
+					if (stage > 4) stage = 4;
+
+					Surface* crack = GetCrackOverlay();
+					if (crack)
+					{
+						const float FRAME_W = (float)World::TILE_SIZE_PX;  // 36 px
+						const float FRAME_H = (float)World::TILE_SIZE_PX;
+						rtRectf src((float)stage * FRAME_W, 0.0f,
+						            ((float)stage + 1) * FRAME_W, FRAME_H);
+						crack->BlitEx(dst, src);
+					}
+					else
+					{
+						// Fallback: dim the cell to show damage
+						uint32 alpha = (uint32)(stage * 50);
+						DrawFilledRect(dst.left, dst.top, TILE, TILE, MAKE_RGBA(0, 0, 0, alpha));
+					}
+				}
 			}
 		}
 	}
@@ -427,13 +557,43 @@ void App::Draw()
 	// Player — delegates to Player::Draw which uses camera transform
 	m_player.Draw(m_camera);
 
+	// Phase 2: aim outline
+	if (m_interaction.HasAim())
+	{
+		int cx = m_interaction.GetAimX();
+		int cy = m_interaction.GetAimY();
+		const float TILE = (float)World::TILE_SIZE_PX;
+
+		CL_Vec2f cellWorld = World::CellToWorld(cx, cy);
+		CL_Vec2f cellScreen = m_camera.WorldToScreen(cellWorld);
+
+		uint32 color = m_interaction.IsAimInReach()
+		    ? MAKE_RGBA(255, 255, 255, 200)
+		    : MAKE_RGBA(255, 60, 60, 200);
+
+		// Draw outline as 4 thin filled rects (1 px borders)
+		DrawFilledRect(cellScreen.x, cellScreen.y, TILE, 1.0f, color);
+		DrawFilledRect(cellScreen.x, cellScreen.y + TILE - 1.0f, TILE, 1.0f, color);
+		DrawFilledRect(cellScreen.x, cellScreen.y, 1.0f, TILE, color);
+		DrawFilledRect(cellScreen.x + TILE - 1.0f, cellScreen.y, 1.0f, TILE, color);
+	}
+
 	// Debug overlay
 	CL_Vec2f pos = m_player.GetPosition();
 	CL_Vec2f vel = m_player.GetVelocity();
+
+	const char* selName = "FIST";
+	if (m_selection.GetKind() == Selection::BLOCK)
+	{
+		selName = GetTileType(m_selection.GetBlockType()).name;
+	}
+
 	char debugBuf[256];
 	snprintf(debugBuf, sizeof(debugBuf),
-		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d",
-		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0);
+		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d  Selected: %s  Aim: (%d, %d) %s",
+		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0, selName,
+		m_interaction.GetAimX(), m_interaction.GetAimY(),
+		m_interaction.IsAimInReach() ? "REACH" : "OUT");
 	GetFont(FONT_SMALL)->Draw(10.0f, 10.0f, debugBuf);
 
 	// Base handles built-in GUI overlay (FPS counter, etc.)

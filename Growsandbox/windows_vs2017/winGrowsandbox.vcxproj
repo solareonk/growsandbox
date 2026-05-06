@@ -1515,6 +1515,10 @@
     <ClCompile Include="..\source\App.cpp" />
     <ClCompile Include="..\source\Camera.cpp" />
     <ClCompile Include="..\source\Player.cpp" />
+    <ClCompile Include="..\source\TileRegistry.cpp" />
+    <ClCompile Include="..\source\World.cpp" />
+    <ClCompile Include="..\source\Selection.cpp" />
+    <ClCompile Include="..\source\Interaction.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\shared\android\AndroidUtils.h" />
@@ -1600,6 +1604,10 @@
     <ClInclude Include="..\source\App.h" />
     <ClInclude Include="..\source\Camera.h" />
     <ClInclude Include="..\source\Player.h" />
+    <ClInclude Include="..\source\TileRegistry.h" />
+    <ClInclude Include="..\source\World.h" />
+    <ClInclude Include="..\source\Selection.h" />
+    <ClInclude Include="..\source\Interaction.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\shared\android\v2_src\java\BillingReceiver.java" />
