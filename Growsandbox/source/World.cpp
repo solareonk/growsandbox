@@ -84,5 +84,23 @@ void World::WorldToCell(const CL_Vec2f& w, int& x, int& y)
     y = (int)std::floor(w.y / (float)TILE_SIZE_PX);
 }
 
-bool World::PunchAt(int x, int y) { return false; /* Task 9 */ }
+bool World::PunchAt(int x, int y)
+{
+    if (!IsInBounds(x, y)) return false;
+    Cell& c = GetCell(x, y);
+
+    // Priority: FG first; if FG is AIR, target BG
+    Tile* target = (c.fg.type != TILE_AIR) ? &c.fg : &c.bg;
+    if (target->type == TILE_AIR) return false;          // nothing to punch
+
+    const TileType& meta = GetTileType(target->type);
+    if (meta.maxHp == 0) return false;                    // unbreakable (bedrock)
+
+    if (target->hp > 0) target->hp--;
+    if (target->hp == 0)
+    {
+        target->type = TILE_AIR;
+    }
+    return true;
+}
 bool World::PlaceAt(int x, int y, TileTypeID type) { return false; /* Task 10 */ }

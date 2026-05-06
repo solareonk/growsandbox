@@ -30,7 +30,11 @@ bool g_bIsFullScreen = false;
 
 App *g_pApp = NULL;
 
-BaseApp * GetBaseApp() 
+static Surface g_crackOverlay;
+static bool    g_crackOverlayLoaded = false;
+static bool    g_crackOverlayTried  = false;
+
+BaseApp * GetBaseApp()
 {
 	if (!g_pApp)
 	{
@@ -39,10 +43,21 @@ BaseApp * GetBaseApp()
 	return g_pApp;
 }
 
-App * GetApp() 
+App * GetApp()
 {
 	assert(g_pApp && "GetBaseApp must be called used first");
 	return g_pApp;
+}
+
+static Surface* GetCrackOverlay()
+{
+	if (!g_crackOverlayTried)
+	{
+		g_crackOverlay.LoadFile("crack_overlay.rttex");
+		g_crackOverlayLoaded = g_crackOverlay.IsLoaded();
+		g_crackOverlayTried = true;
+	}
+	return g_crackOverlayLoaded ? &g_crackOverlay : NULL;
 }
 
 App::App()
@@ -94,6 +109,12 @@ bool App::Init()
 void App::Kill()
 {
 	TileRegistry_Shutdown();
+	if (g_crackOverlayLoaded)
+	{
+		g_crackOverlay.Kill();
+		g_crackOverlayLoaded = false;
+		g_crackOverlayTried = false;
+	}
 	BaseApp::Kill();
 }
 
@@ -479,6 +500,50 @@ void App::Draw()
 						    ? MAKE_RGBA(50, 50, 50, 255)
 						    : MAKE_RGBA(255, 0, 255, 255);
 						DrawFilledRect(dst.left, dst.top, TILE, TILE, color);
+					}
+				}
+
+				// Crack overlay — render on whichever layer (FG or BG) is being damaged
+				const Tile* damaged = NULL;
+				if (c.fg.type != TILE_AIR)
+				{
+					const TileType& fgMeta = GetTileType(c.fg.type);
+					if (fgMeta.maxHp > 0 && c.fg.hp < fgMeta.maxHp)
+					{
+						damaged = &c.fg;
+					}
+				}
+				else if (c.bg.type != TILE_AIR)
+				{
+					const TileType& bgMeta = GetTileType(c.bg.type);
+					if (bgMeta.maxHp > 0 && c.bg.hp < bgMeta.maxHp)
+					{
+						damaged = &c.bg;
+					}
+				}
+
+				if (damaged)
+				{
+					const TileType& meta = GetTileType(damaged->type);
+					// hp range 0..maxHp; stage range 1..4 (skip 0 = uncracked)
+					int stage = 4 - (int)((float)damaged->hp / (float)meta.maxHp * 4.0f);
+					if (stage < 1) stage = 1;
+					if (stage > 4) stage = 4;
+
+					Surface* crack = GetCrackOverlay();
+					if (crack)
+					{
+						const float FRAME_W = (float)World::TILE_SIZE_PX;  // 36 px
+						const float FRAME_H = (float)World::TILE_SIZE_PX;
+						rtRectf src((float)stage * FRAME_W, 0.0f,
+						            ((float)stage + 1) * FRAME_W, FRAME_H);
+						crack->BlitEx(dst, src);
+					}
+					else
+					{
+						// Fallback: dim the cell to show damage
+						uint32 alpha = (uint32)(stage * 50);
+						DrawFilledRect(dst.left, dst.top, TILE, TILE, MAKE_RGBA(0, 0, 0, alpha));
 					}
 				}
 			}

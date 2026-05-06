@@ -49,8 +49,26 @@ void Interaction::Update(World& world,
     // 4. punch timer (used in Task 9 for rate-limit; tick now to be ready)
     m_punchTimer += dt;
 
-    // 5. dispatch — Task 9 fills punch, Task 10 fills place
-    (void)clickHeld;
-    (void)selection;
-    (void)world;
+    // 5. dispatch — punch (Task 9) and place (Task 10)
+    if (clickHeld && m_inReach && world.IsInBounds(cx, cy))
+    {
+        const float intervalSec = (float)PUNCH_INTERVAL_MS / 1000.0f;
+        if (m_punchTimer >= intervalSec)
+        {
+            if (selection.GetKind() == Selection::FIST)
+            {
+                if (world.PunchAt(cx, cy))
+                {
+                    m_punchTimer = 0.0f;
+                }
+            }
+            // Selection::BLOCK handled in Task 10
+        }
+    }
+    else
+    {
+        // Not clicking or out of reach — keep timer charged so the next click acts immediately
+        const float intervalSec = (float)PUNCH_INTERVAL_MS / 1000.0f;
+        if (m_punchTimer > intervalSec) m_punchTimer = intervalSec;
+    }
 }
