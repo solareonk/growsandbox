@@ -342,6 +342,9 @@
     <ClInclude Include="..\source\Interaction.h">
       <Filter>source</Filter>
     </ClInclude>
+    <ClInclude Include="..\source\Drop.h">
+      <Filter>source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\shared\win\app\main.h">
       <Filter>source</Filter>
     </ClInclude>

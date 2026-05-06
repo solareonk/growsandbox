@@ -82,9 +82,10 @@ private:
 	// Phase 3b: backpack slide-up animation (0=closed/offscreen, 1=fully open)
 	float    m_backpackAnim;
 
-	// Phase 3b: draw helpers (stubs until Tasks 6-7)
+	// Phase 3b: draw helpers
 	void DrawHotbar();
 	void DrawBackpack();
+	void DrawDrops();   // Phase 3b extension: floating world drops
 };
 
 

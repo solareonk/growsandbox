@@ -1607,6 +1607,7 @@
     <ClInclude Include="..\source\TileRegistry.h" />
     <ClInclude Include="..\source\World.h" />
     <ClInclude Include="..\source\Inventory.h" />
+    <ClInclude Include="..\source\Drop.h" />
     <ClInclude Include="..\source\Interaction.h" />
   </ItemGroup>
   <ItemGroup>

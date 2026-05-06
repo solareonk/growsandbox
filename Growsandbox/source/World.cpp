@@ -120,3 +120,90 @@ bool World::PlaceAt(int x, int y, TileTypeID type)
     targetSlot.hp   = meta.maxHp;
     return true;
 }
+
+// Phase 3b extension: floating drops -----------------------------------------
+
+#include "Player.h"
+#include "Inventory.h"
+
+void World::SpawnDrop(TileTypeID type, int cx, int cy)
+{
+    if (type == TILE_AIR) return;
+    const TileType& meta = GetTileType(type);
+    if (meta.stackMax == 0) return;  // not pickupable (e.g., AIR, BEDROCK)
+
+    WorldDrop d = {};
+    d.type     = type;
+    d.count    = 1;
+    d.x        = ((float)cx + 0.5f) * (float)TILE_SIZE_PX;
+    d.y        = ((float)cy + 0.5f) * (float)TILE_SIZE_PX;
+    d.vy       = -120.0f;   // small upward pop for visual feedback
+    d.bobTimer = 0.0f;
+    d.onGround = false;
+    m_drops.push_back(d);
+}
+
+void World::UpdateDrops(float dt, const Player& player, Inventory& inv)
+{
+    const float GRAVITY      = 1200.0f;
+    const float TERMINAL_VY  = 800.0f;
+    const float DROP_SIZE    = 22.0f;
+    const float DROP_HALF    = DROP_SIZE * 0.5f;
+
+    // Player AABB (top-left + W/H, see Interaction.cpp convention)
+    CL_Vec2f pp = player.GetPosition();
+    float pLeft   = pp.x;
+    float pRight  = pp.x + Player::HITBOX_WIDTH;
+    float pTop    = pp.y;
+    float pBottom = pp.y + Player::HITBOX_HEIGHT;
+
+    for (size_t i = 0; i < m_drops.size(); )
+    {
+        WorldDrop& d = m_drops[i];
+        d.bobTimer += dt;
+
+        // Physics: gravity + ground settle
+        if (!d.onGround)
+        {
+            d.vy += GRAVITY * dt;
+            if (d.vy > TERMINAL_VY) d.vy = TERMINAL_VY;
+
+            float newY = d.y + d.vy * dt;
+
+            // Check tile under drop bottom
+            int cx = (int)(d.x / (float)TILE_SIZE_PX);
+            int cyBottom = (int)((newY + DROP_HALF) / (float)TILE_SIZE_PX);
+
+            if (IsInBounds(cx, cyBottom) && IsSolidAt(cx, cyBottom))
+            {
+                // Settle on top of this tile
+                d.y       = (float)cyBottom * (float)TILE_SIZE_PX - DROP_HALF;
+                d.vy      = 0.0f;
+                d.onGround = true;
+            }
+            else
+            {
+                d.y = newY;
+            }
+        }
+
+        // Pickup check: drop AABB vs player AABB
+        float dLeft   = d.x - DROP_HALF;
+        float dRight  = d.x + DROP_HALF;
+        float dTop    = d.y - DROP_HALF;
+        float dBottom = d.y + DROP_HALF;
+
+        bool overlap = dLeft < pRight && dRight > pLeft &&
+                       dTop  < pBottom && dBottom > pTop;
+
+        if (overlap && inv.TryAdd(d.type, d.count))
+        {
+            // Picked up — remove drop. Swap-pop avoids vector shift.
+            m_drops[i] = m_drops.back();
+            m_drops.pop_back();
+            continue;
+        }
+
+        ++i;
+    }
+}

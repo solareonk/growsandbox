@@ -61,10 +61,9 @@ void Interaction::Update(World& world,
                 TileTypeID broken = world.PunchAt(cx, cy);
                 if (broken != TILE_AIR)
                 {
-                    if (!inv.TryAdd(broken, 1))
-                    {
-                        LogMsg("Inventory full: dropped %s", GetTileType(broken).name);
-                    }
+                    // Phase 3b extension: spawn a floating drop instead of
+                    // direct inventory add. Player picks up by walking over.
+                    world.SpawnDrop(broken, cx, cy);
                 }
                 m_punchTimer = 0.0f;
             }

@@ -355,7 +355,8 @@ void AppInputRawKeyboard(VariantList *pVList)
             if (keyInfo == VIRTUAL_KEY_PRESS)
             {
                 GetApp()->GetWorld().GenerateInitial();
-                GetApp()->GetInventory().Clear();   // Phase 3b: R also clears inventory
+                GetApp()->GetWorld().ClearDrops();   // Phase 3b ext: also clear drops
+                GetApp()->GetInventory().Clear();    // Phase 3b: R also clears inventory
             }
             keyName = "R (Reset)";
             break;
@@ -571,6 +572,9 @@ void App::Update()
 	m_interaction.Update(m_world, m_player, m_camera,
 	                     m_mousePos, m_mouseDown, m_inventory, dt);
 
+	// Phase 3b extension: tick floating drops (gravity + auto-pickup on player overlap)
+	m_world.UpdateDrops(dt, m_player, m_inventory);
+
 	// Phase 3b: tick backpack slide animation toward target (4.0/sec = 250ms full transition)
 	float target = m_inventory.IsBackpackOpen() ? 1.0f : 0.0f;
 	const float ANIM_RATE = 4.0f;
@@ -716,6 +720,9 @@ void App::Draw()
 			}
 		}
 	}
+
+	// Phase 3b extension: floating world drops (between tiles and player)
+	DrawDrops();
 
 	// Player — delegates to Player::Draw which uses camera transform
 	m_player.Draw(m_camera);
@@ -1023,6 +1030,45 @@ void App::DrawBackpack()
                 snprintf(countBuf, sizeof(countBuf), "%d", (int)s.count);
                 GetFont(FONT_SMALL)->Draw((float)(sx + SLOT_SIZE - 18), (float)(sy + SLOT_SIZE - 14), countBuf);
             }
+        }
+    }
+}
+
+// Phase 3b extension: render floating world drops with sine bob animation.
+void App::DrawDrops()
+{
+    const std::vector<WorldDrop>& drops = m_world.GetDrops();
+    if (drops.empty()) return;
+
+    const float DROP_SIZE = 22.0f;
+    const float DROP_HALF = DROP_SIZE * 0.5f;
+
+    for (size_t i = 0; i < drops.size(); i++)
+    {
+        const WorldDrop& d = drops[i];
+
+        // Subtle sine bob: 3-px amplitude at ~1.2 Hz once settled
+        float bobOffset = sinf(d.bobTimer * 7.5f) * 3.0f;
+
+        CL_Vec2f worldPos(d.x - DROP_HALF, d.y - DROP_HALF + bobOffset);
+        CL_Vec2f screenPos = m_camera.WorldToScreen(worldPos);
+
+        // Off-screen cull
+        if (screenPos.x < -DROP_SIZE || screenPos.x > 1024.0f) continue;
+        if (screenPos.y < -DROP_SIZE || screenPos.y > 768.0f)  continue;
+
+        Surface* surf = GetTileSurface(d.type);
+        if (surf)
+        {
+            rtRectf dst(screenPos.x, screenPos.y,
+                        screenPos.x + DROP_SIZE, screenPos.y + DROP_SIZE);
+            rtRectf src(0.0f, 0.0f, (float)surf->GetWidth(), (float)surf->GetHeight());
+            surf->BlitEx(dst, src);
+        }
+        else
+        {
+            DrawFilledRect(screenPos.x, screenPos.y, DROP_SIZE, DROP_SIZE,
+                           MAKE_RGBA(255, 0, 255, 255));
         }
     }
 }
