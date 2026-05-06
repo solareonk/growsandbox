@@ -26,10 +26,13 @@ static void ResolveAxisX(CL_Vec2f& pos, CL_Vec2f& vel, const World* world)
     if (!world) return;
     const float TILE = (float)World::TILE_SIZE_PX;
 
-    int cellMinX = (int)std::floor( pos.x                 / TILE);
-    int cellMaxX = (int)std::floor((pos.x + WIDTH  - 1)   / TILE);
-    int cellMinY = (int)std::floor( pos.y                 / TILE);
-    int cellMaxY = (int)std::floor((pos.y + HEIGHT - 1)   / TILE);
+    // Note: cellMax uses (pos + size) without -1 so a player AABB that's barely
+    // overlapping a tile by sub-pixel still includes that tile in the iteration.
+    // The inner per-tile overlap check handles touching-edge cases (no false positive).
+    int cellMinX = (int)std::floor( pos.x              / TILE);
+    int cellMaxX = (int)std::floor((pos.x + WIDTH)     / TILE);
+    int cellMinY = (int)std::floor( pos.y              / TILE);
+    int cellMaxY = (int)std::floor((pos.y + HEIGHT)    / TILE);
 
     for (int cy = cellMinY; cy <= cellMaxY; cy++)
     {
@@ -57,10 +60,11 @@ static void ResolveAxisY(CL_Vec2f& pos, CL_Vec2f& vel, bool& onGround, const Wor
     if (!world) return;
     const float TILE = (float)World::TILE_SIZE_PX;
 
-    int cellMinX = (int)std::floor( pos.x                 / TILE);
-    int cellMaxX = (int)std::floor((pos.x + WIDTH  - 1)   / TILE);
-    int cellMinY = (int)std::floor( pos.y                 / TILE);
-    int cellMaxY = (int)std::floor((pos.y + HEIGHT - 1)   / TILE);
+    // See ResolveAxisX comment — cellMax uses (pos + size) without -1.
+    int cellMinX = (int)std::floor( pos.x              / TILE);
+    int cellMaxX = (int)std::floor((pos.x + WIDTH)     / TILE);
+    int cellMinY = (int)std::floor( pos.y              / TILE);
+    int cellMaxY = (int)std::floor((pos.y + HEIGHT)    / TILE);
 
     for (int cy = cellMinY; cy <= cellMaxY; cy++)
     {
