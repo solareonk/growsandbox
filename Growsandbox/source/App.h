@@ -42,7 +42,6 @@ public:
 private:
 
 	bool m_bDidPostInit;
-	SurfaceAnim m_surf; //for testing
 
 	// Phase 1 additions
 	Player m_player;

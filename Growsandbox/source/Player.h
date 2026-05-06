@@ -7,6 +7,10 @@ class World;
 class Player
 {
 public:
+    // Public hitbox dimensions (used by Interaction reach calc + squish guard).
+    static constexpr float HITBOX_WIDTH  = 32.0f;
+    static constexpr float HITBOX_HEIGHT = 48.0f;
+
     Player();
 
     void SetInput(bool inputLeft, bool inputRight, bool inputJump);

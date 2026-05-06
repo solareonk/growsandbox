@@ -37,8 +37,8 @@ void Interaction::Update(World& world,
     CL_Vec2f cellCenter = World::CellToWorld(cx, cy) + CL_Vec2f(TILE * 0.5f, TILE * 0.5f);
 
     // Player hitbox is 32x48 (Player.cpp constants)
-    const float PLAYER_W = 32.0f;
-    const float PLAYER_H = 48.0f;
+    const float PLAYER_W = Player::HITBOX_WIDTH;
+    const float PLAYER_H = Player::HITBOX_HEIGHT;
     CL_Vec2f playerCenter = player.GetPosition() + CL_Vec2f(PLAYER_W * 0.5f, PLAYER_H * 0.5f);
 
     float dx = cellCenter.x - playerCenter.x;
@@ -72,8 +72,8 @@ void Interaction::Update(World& world,
                 if (meta.layer == TileType::FG_ONLY && meta.solid)
                 {
                     const float TILE = (float)World::TILE_SIZE_PX;
-                    const float PLAYER_W = 32.0f;
-                    const float PLAYER_H = 48.0f;
+                    const float PLAYER_W = Player::HITBOX_WIDTH;
+                    const float PLAYER_H = Player::HITBOX_HEIGHT;
                     CL_Vec2f pp = player.GetPosition();
                     float cellLeft   = (float)cx * TILE;
                     float cellTop    = (float)cy * TILE;

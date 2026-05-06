@@ -5,8 +5,8 @@
 #include <cmath>
 
 // Tuning constants per spec — adjust during playtesting.
-static const float WIDTH          = 32.0f;
-static const float HEIGHT         = 48.0f;
+static const float WIDTH          = Player::HITBOX_WIDTH;
+static const float HEIGHT         = Player::HITBOX_HEIGHT;
 static const float GRAVITY        = 1500.0f;
 static const float MOVE_SPEED     = 300.0f;
 static const float JUMP_VELOCITY  = -550.0f;
