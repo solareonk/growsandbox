@@ -669,13 +669,31 @@ void App::Draw()
 	CL_Vec2f pos = m_player.GetPosition();
 	CL_Vec2f vel = m_player.GetVelocity();
 
-	// Phase 3b: show selected item from Inventory
-	const char* selName = m_inventory.IsFistSelected() ? "FIST" : GetTileType(m_inventory.GetSelectedTile()).name;
+	// Phase 3b: show selected item from Inventory in 3-state format
+	char selBuf[64];
+	int selSlot = m_inventory.GetSelectedHotbarSlot();
+	if (selSlot == 0)
+	{
+		snprintf(selBuf, sizeof(selBuf), "FIST");
+	}
+	else
+	{
+		const InventorySlot& s = m_inventory.GetHotbarSlot(selSlot);
+		if (s.type == TILE_AIR || s.count == 0)
+		{
+			snprintf(selBuf, sizeof(selBuf), "FIST (slot %d empty)", selSlot);
+		}
+		else
+		{
+			snprintf(selBuf, sizeof(selBuf), "%s (slot %d, count %d)",
+			         GetTileType(s.type).name, selSlot, (int)s.count);
+		}
+	}
 
 	char debugBuf[256];
 	snprintf(debugBuf, sizeof(debugBuf),
 		"Pos: (%.0f, %.0f)  Vel: (%.0f, %.0f)  OnGround: %d  Selected: %s  Aim: (%d, %d) %s",
-		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0, selName,
+		pos.x, pos.y, vel.x, vel.y, m_player.IsOnGround() ? 1 : 0, selBuf,
 		m_interaction.GetAimX(), m_interaction.GetAimY(),
 		m_interaction.IsAimInReach() ? "REACH" : "OUT");
 	GetFont(FONT_SMALL)->Draw(10.0f, 10.0f, debugBuf);
