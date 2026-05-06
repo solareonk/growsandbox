@@ -127,6 +127,18 @@
     <ClCompile Include="..\source\Player.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\source\TileRegistry.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\World.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\Selection.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\Interaction.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\shared\win\app\main.cpp">
       <Filter>source</Filter>
     </ClCompile>
@@ -316,6 +328,18 @@
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\source\Player.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\TileRegistry.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\World.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\Selection.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\Interaction.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\win\app\main.h">
