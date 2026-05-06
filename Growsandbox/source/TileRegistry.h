@@ -38,3 +38,8 @@ Surface* GetTileSurface(TileTypeID id);
 // Releases all lazy-loaded tile surfaces. Must be called from App::Kill()
 // BEFORE BaseApp::Kill(), while the GL context is still alive.
 void TileRegistry_Shutdown();
+
+// Phase 3a: Load tile metadata from binary file. Returns true on success,
+// false on any I/O or format error (caller logs/exits).
+// MUST be called before GetTileType/GetTileSurface.
+bool TileRegistry_Load(const char* path);
