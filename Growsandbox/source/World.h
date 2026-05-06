@@ -1,6 +1,11 @@
 #pragma once
 #include "PlatformPrecomp.h"
 #include "TileRegistry.h"
+#include "Drop.h"
+#include <vector>
+
+class Inventory;
+class Player;
 
 struct Tile
 {
@@ -32,9 +37,16 @@ public:
     static CL_Vec2f CellToWorld(int x, int y);
     static void     WorldToCell(const CL_Vec2f& w, int& x, int& y);
 
-    bool PunchAt(int x, int y);
+    TileTypeID PunchAt(int x, int y);  // Phase 3b: returns broken tile type, TILE_AIR = no break
     bool PlaceAt(int x, int y, TileTypeID type);
+
+    // Phase 3b extension: floating world drops
+    void SpawnDrop(TileTypeID type, int cx, int cy);
+    void UpdateDrops(float dt, const Player& player, Inventory& inv);
+    const std::vector<WorldDrop>& GetDrops() const { return m_drops; }
+    void ClearDrops() { m_drops.clear(); }
 
 private:
     Cell m_cells[WIDTH * HEIGHT];
+    std::vector<WorldDrop> m_drops;
 };

@@ -4,7 +4,7 @@
 class World;
 class Player;
 class Camera;
-class Selection;
+class Inventory;  // Phase 3b: replaces Selection
 
 class Interaction
 {
@@ -14,12 +14,13 @@ public:
 
     Interaction();
 
+    // Phase 3b: takes Inventory& instead of const Selection&
     void Update(World& world,
                 const Player& player,
                 const Camera& camera,
                 CL_Vec2f mouseScreenPos,
                 bool clickHeld,
-                const Selection& selection,
+                Inventory& inv,
                 float dt);
 
     bool HasAim() const     { return m_hasAim; }

@@ -3,7 +3,8 @@
 #include "World.h"
 #include "Player.h"
 #include "Camera.h"
-#include "Selection.h"
+#include "Inventory.h"
+#include "TileRegistry.h"
 
 Interaction::Interaction()
     : m_aimX(-1), m_aimY(-1), m_hasAim(false), m_inReach(false), m_punchTimer(0.0f)
@@ -11,12 +12,12 @@ Interaction::Interaction()
 }
 
 void Interaction::Update(World& world,
-                          const Player& player,
-                          const Camera& camera,
-                          CL_Vec2f mouseScreenPos,
-                          bool clickHeld,
-                          const Selection& selection,
-                          float dt)
+                         const Player& player,
+                         const Camera& camera,
+                         CL_Vec2f mouseScreenPos,
+                         bool clickHeld,
+                         Inventory& inv,
+                         float dt)
 {
     // 1. mouse screen → world
     CL_Vec2f camPos = camera.GetPosition();
@@ -46,7 +47,7 @@ void Interaction::Update(World& world,
     float distTiles = sqrtf(dx * dx + dy * dy) / TILE;
     m_inReach = (distTiles <= (float)REACH_TILES);
 
-    // 4. punch timer (used in Task 9 for rate-limit; tick now to be ready)
+    // 4. punch timer
     m_punchTimer += dt;
 
     // 5. dispatch — punch + place
@@ -55,37 +56,43 @@ void Interaction::Update(World& world,
         const float intervalSec = (float)PUNCH_INTERVAL_MS / 1000.0f;
         if (m_punchTimer >= intervalSec)
         {
-            if (selection.GetKind() == Selection::FIST)
+            if (inv.IsFistSelected())
             {
-                if (world.PunchAt(cx, cy))
+                TileTypeID broken = world.PunchAt(cx, cy);
+                if (broken != TILE_AIR)
                 {
-                    m_punchTimer = 0.0f;
+                    // Phase 3b extension: spawn a floating drop instead of
+                    // direct inventory add. Player picks up by walking over.
+                    world.SpawnDrop(broken, cx, cy);
                 }
+                m_punchTimer = 0.0f;
             }
-            else // Selection::BLOCK
+            else
             {
-                TileTypeID t = selection.GetBlockType();
-                const TileType& meta = GetTileType(t);
-
-                // Self-squish guard: do not place an FG-solid block where it overlaps player AABB
-                bool wouldSquish = false;
-                if (meta.layer == TileType::FG_ONLY && meta.solid)
+                // BLOCK selected — try place
+                TileTypeID t = inv.GetSelectedTile();
+                if (t != TILE_AIR)
                 {
-                    const float TILE = (float)World::TILE_SIZE_PX;
-                    const float PLAYER_W = Player::HITBOX_WIDTH;
-                    const float PLAYER_H = Player::HITBOX_HEIGHT;
-                    CL_Vec2f pp = player.GetPosition();
-                    float cellLeft   = (float)cx * TILE;
-                    float cellTop    = (float)cy * TILE;
-                    float cellRight  = cellLeft + TILE;
-                    float cellBottom = cellTop + TILE;
-                    bool overlapX = pp.x + PLAYER_W > cellLeft && pp.x < cellRight;
-                    bool overlapY = pp.y + PLAYER_H > cellTop  && pp.y < cellBottom;
-                    wouldSquish = overlapX && overlapY;
-                }
+                    const TileType& meta = GetTileType(t);
 
-                if (!wouldSquish && world.PlaceAt(cx, cy, t))
-                {
+                    // Self-squish guard: do not place an FG-solid block where it overlaps player AABB
+                    bool wouldSquish = false;
+                    if (meta.layer == TileType::FG_ONLY && meta.solid)
+                    {
+                        CL_Vec2f pp = player.GetPosition();
+                        float cellLeft   = (float)cx * TILE;
+                        float cellTop    = (float)cy * TILE;
+                        float cellRight  = cellLeft + TILE;
+                        float cellBottom = cellTop + TILE;
+                        bool overlapX = pp.x + PLAYER_W > cellLeft && pp.x < cellRight;
+                        bool overlapY = pp.y + PLAYER_H > cellTop  && pp.y < cellBottom;
+                        wouldSquish = overlapX && overlapY;
+                    }
+
+                    if (!wouldSquish && world.PlaceAt(cx, cy, t))
+                    {
+                        inv.TryConsumeSelected();
+                    }
                     m_punchTimer = 0.0f;
                 }
             }

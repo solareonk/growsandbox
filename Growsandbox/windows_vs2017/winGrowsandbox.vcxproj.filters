@@ -133,7 +133,7 @@
     <ClCompile Include="..\source\World.cpp">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="..\source\Selection.cpp">
+    <ClCompile Include="..\source\Inventory.cpp">
       <Filter>source</Filter>
     </ClCompile>
     <ClCompile Include="..\source\Interaction.cpp">
@@ -336,10 +336,13 @@
     <ClInclude Include="..\source\World.h">
       <Filter>source</Filter>
     </ClInclude>
-    <ClInclude Include="..\source\Selection.h">
+    <ClInclude Include="..\source\Inventory.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\source\Interaction.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\Drop.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\shared\win\app\main.h">
