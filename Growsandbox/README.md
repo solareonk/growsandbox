@@ -2,7 +2,7 @@
 
 A 2D side-view sandbox prototype built on [Proton SDK](https://github.com/SethRobinson/proton).
 
-**Status:** Phase 3a (Item Registry) complete — tile metadata loaded from binary `items.dat` via Python encoder pipeline.
+**Status:** Phase 3b (Inventory + Hotbar) complete — players mine to populate a 5-slot hotbar + 30-slot backpack with Growtopia-style slide-up panel.
 
 This is the very early foundation of a long-term hobby project — a 2D MMO sandbox in the spirit of *Growtopia*, with original IP and assets. Phase 2 builds on Phase 1's engine layer to deliver a real tile grid with destructible/placeable blocks.
 
@@ -40,10 +40,23 @@ This is the very early foundation of a long-term hobby project — a 2D MMO sand
 - ✅ Fail-fast `MessageBox` on missing/corrupt/version-mismatched `items.dat` with actionable instruction
 - ✅ Phase 2 verification matrix passes — zero behavior change
 
+## What Phase 3b Delivers
+
+- ✅ `Inventory` class — 5-slot hotbar (slot 0 = FIST permanent) + 30-slot backpack (10×3)
+- ✅ Hotbar always visible at bottom-center; selected slot has yellow outline
+- ✅ Backpack hidden by default — opens via **drag-up gesture** on grab handle (Grab/Growtopia bottom-sheet style)
+- ✅ Slide-up animation: hotbar + backpack lift together as one sheet over ~250ms with smooth easing
+- ✅ Pickup-on-break: stack-first-then-backpack-empty rule (uses Phase 3a's `stackMax`)
+- ✅ Place consumes from selected hotbar slot; auto-fallback to FIST on depletion
+- ✅ Mouse scroll wheel cycles selected hotbar slot
+- ✅ Click backpack item → moves to hotbar; right-click hotbar item → moves to backpack
+- ✅ World punch/place still works while backpack is open (UI absorbs only its own area)
+- ✅ Keys 1-5 select hotbar slots; R clears inventory + regenerates world; ESC exits
+- ✅ `Selection` class removed — semantics folded into `Inventory`
+
 ## Roadmap (Future Phases — Separate Specs)
 
-- **Phase 3b** — Inventory data structure + hotbar UI (depends on 3a item IDs)
-- **Phase 3c** — Save persistence for player + world state
+- **Phase 3c** — Save persistence for player + world state (next)
 - **Phase 4** — Multiplayer networking via ENet
 - **Phase 5** — Multi-world hosting & accounts
 - **Phase 6+** — Game content, items, polish
