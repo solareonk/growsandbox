@@ -51,6 +51,8 @@ App::App()
 	, m_inputRight(false)
 	, m_inputJump(false)
 	, m_worldGenerated(false)
+	, m_mousePos(0.0f, 0.0f)
+	, m_mouseDown(false)
 {
 }
 
@@ -301,17 +303,19 @@ void AppInput(VariantList *pVList)
 	{
 	
 	case MESSAGE_TYPE_GUI_CLICK_START:
-		LogMsg("Touch start: X: %.2f Y: %.2f (Finger %d)", pt.x, pt.y, fingerID);
+		GetApp()->SetMousePos(pt);
+		GetApp()->SetMouseDown(true);
 		break;
 	case MESSAGE_TYPE_GUI_MOUSEWHEEL:
 		LogMsg("Mouse wheel: Offet: %.2f (Finger %d)", pVList->Get(4).GetVector2().x, fingerID);
 		break;
 
 	case MESSAGE_TYPE_GUI_CLICK_MOVE_RAW:
-		//LogMsg("Touch raw move: X: %.2f YL %.2f (Finger %d)", pt.x, pt.y, fingerID);
+		GetApp()->SetMousePos(pt);
 		break;
 	case MESSAGE_TYPE_GUI_CLICK_END:
-		LogMsg("Touch end: X: %.2f Y: %.2f (Finger %d)", pt.x, pt.y, fingerID);
+		GetApp()->SetMousePos(pt);
+		GetApp()->SetMouseDown(false);
 		break;
 
 	case MESSAGE_TYPE_GUI_CHAR:

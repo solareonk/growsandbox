@@ -34,6 +34,8 @@ public:
 	void OnAccel(VariantList *pVList);
 	void OnArcadeInput(VariantList *pVList);
 	Selection& GetSelection() { return m_selection; }
+	void SetMousePos(const CL_Vec2f& p) { m_mousePos = p; }
+	void SetMouseDown(bool d)            { m_mouseDown = d; }
 
 private:
 
@@ -51,6 +53,10 @@ private:
 	World m_world;
 	bool m_worldGenerated;
 	Selection m_selection;
+
+	// Phase 2: mouse state
+	CL_Vec2f m_mousePos;
+	bool     m_mouseDown;
 };
 
 
