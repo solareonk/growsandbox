@@ -662,6 +662,8 @@ void App::Draw()
 		DrawFilledRect(cellScreen.x + TILE - 1.0f, cellScreen.y, 1.0f, TILE, color);
 	}
 
+	DrawHotbar();
+
 	// Debug overlay
 	CL_Vec2f pos = m_player.GetPosition();
 	CL_Vec2f vel = m_player.GetVelocity();
@@ -744,7 +746,74 @@ int App::HitTestBackpackSlot(int mx, int my)
 }
 
 // Stubs for Tasks 6-7. Empty bodies keep this task's build clean.
-void App::DrawHotbar() {}
+void App::DrawHotbar()
+{
+    const int SLOT_SIZE   = 48;
+    const int HOTBAR_X    = (1024 - 4 * SLOT_SIZE) / 2;  // 416
+    const int HOTBAR_Y    = 768 - 12 - SLOT_SIZE;        // 708
+
+    // Background panel — semi-transparent dark
+    DrawFilledRect((float)HOTBAR_X - 4, (float)HOTBAR_Y - 4,
+                   (float)(4 * SLOT_SIZE + 8), (float)(SLOT_SIZE + 8),
+                   MAKE_RGBA(0, 0, 0, 180));
+
+    int selected = m_inventory.GetSelectedHotbarSlot();
+
+    for (int i = 0; i < Inventory::HOTBAR_SLOTS; i++)
+    {
+        int sx = HOTBAR_X + i * SLOT_SIZE;
+        int sy = HOTBAR_Y;
+
+        // Slot background
+        DrawFilledRect((float)sx, (float)sy,
+                       (float)SLOT_SIZE, (float)SLOT_SIZE,
+                       MAKE_RGBA(40, 40, 40, 200));
+
+        // Slot border (1px)
+        DrawFilledRect((float)sx, (float)sy, (float)SLOT_SIZE, 1.0f, MAKE_RGBA(80, 80, 80, 255));
+        DrawFilledRect((float)sx, (float)(sy + SLOT_SIZE - 1), (float)SLOT_SIZE, 1.0f, MAKE_RGBA(80, 80, 80, 255));
+        DrawFilledRect((float)sx, (float)sy, 1.0f, (float)SLOT_SIZE, MAKE_RGBA(80, 80, 80, 255));
+        DrawFilledRect((float)(sx + SLOT_SIZE - 1), (float)sy, 1.0f, (float)SLOT_SIZE, MAKE_RGBA(80, 80, 80, 255));
+
+        // Slot content
+        const InventorySlot& s = m_inventory.GetHotbarSlot(i);
+        if (i == 0)
+        {
+            // FIST slot — magenta-fallback rect with "FIST" label centered
+            DrawFilledRect((float)(sx + 8), (float)(sy + 8), 32.0f, 32.0f, MAKE_RGBA(200, 200, 200, 255));
+            GetFont(FONT_SMALL)->Draw((float)(sx + 13), (float)(sy + 18), "FIST");
+        }
+        else if (s.type != TILE_AIR && s.count > 0)
+        {
+            // Item slot — tile texture + count
+            Surface* surf = GetTileSurface(s.type);
+            if (surf)
+            {
+                rtRectf dst((float)(sx + 8), (float)(sy + 8),
+                            (float)(sx + 8 + 32), (float)(sy + 8 + 32));
+                rtRectf src(0.0f, 0.0f, (float)surf->GetWidth(), (float)surf->GetHeight());
+                surf->BlitEx(dst, src);
+            }
+            else
+            {
+                DrawFilledRect((float)(sx + 8), (float)(sy + 8), 32.0f, 32.0f, MAKE_RGBA(255, 0, 255, 255));
+            }
+            char countBuf[8];
+            snprintf(countBuf, sizeof(countBuf), "%d", (int)s.count);
+            GetFont(FONT_SMALL)->Draw((float)(sx + SLOT_SIZE - 18), (float)(sy + SLOT_SIZE - 14), countBuf);
+        }
+        // else empty slot — no content rendered
+
+        // Selected highlight (yellow 2-px outline)
+        if (i == selected)
+        {
+            DrawFilledRect((float)sx, (float)sy, (float)SLOT_SIZE, 2.0f, MAKE_RGBA(255, 220, 60, 255));
+            DrawFilledRect((float)sx, (float)(sy + SLOT_SIZE - 2), (float)SLOT_SIZE, 2.0f, MAKE_RGBA(255, 220, 60, 255));
+            DrawFilledRect((float)sx, (float)sy, 2.0f, (float)SLOT_SIZE, MAKE_RGBA(255, 220, 60, 255));
+            DrawFilledRect((float)(sx + SLOT_SIZE - 2), (float)sy, 2.0f, (float)SLOT_SIZE, MAKE_RGBA(255, 220, 60, 255));
+        }
+    }
+}
 void App::DrawBackpack() {}
 
 bool App::OnPreInitVideo()
