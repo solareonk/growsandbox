@@ -50,7 +50,7 @@ App::App()
 	, m_inputLeft(false)
 	, m_inputRight(false)
 	, m_inputJump(false)
-	, m_tilesLoaded(false)
+	, m_worldGenerated(false)
 {
 }
 
@@ -365,63 +365,82 @@ void App::Draw()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	CLEAR_GL_ERRORS()
 
-	// Ground — tiled with Kenney pixel-platformer tiles
-	if (!m_tilesLoaded)
+	// Phase 2: render World grid (BG + FG layers, camera-culled)
+	if (!m_worldGenerated)
 	{
-		m_tileGrass.LoadFile("tile_grass.rttex");
-		m_tileDirt.LoadFile("tile_dirt.rttex");
-		m_tilesLoaded = true;
+		m_world.GenerateInitial();
+		m_worldGenerated = true;
 	}
 
-	if (m_tileGrass.IsLoaded() && m_tileDirt.IsLoaded())
 	{
-		const float TILE_SIZE = 36.0f;        // 18x18 native scaled 2x
-		const float GROUND_Y_WORLD = 500.0f;  // matches Player::GROUND_Y
-
-		// Native sprite size for sampling
-		float texW = (float)m_tileGrass.GetWidth();
-		float texH = (float)m_tileGrass.GetHeight();
-		rtRectf srcRect(0.0f, 0.0f, texW, texH);
-
-		// Determine which world X column the camera leftmost screen edge is at
+		const float TILE = (float)World::TILE_SIZE_PX;
 		CL_Vec2f camPos = m_camera.GetPosition();
 		float screenW = GetScreenSizeXf();
 		float screenH = GetScreenSizeYf();
 
-		float worldLeft = camPos.x - screenW * 0.5f;
+		float worldLeft  = camPos.x - screenW * 0.5f;
 		float worldRight = camPos.x + screenW * 0.5f;
+		float worldTop   = camPos.y - screenH * 0.5f;
+		float worldBot   = camPos.y + screenH * 0.5f;
 
-		// Snap to tile grid: first tile column visible
-		int firstCol = (int)std::floor(worldLeft / TILE_SIZE) - 1;  // -1 buffer
-		int lastCol  = (int)std::floor(worldRight / TILE_SIZE) + 1;
+		int firstCol = (int)std::floor(worldLeft  / TILE) - 1;
+		int lastCol  = (int)std::floor(worldRight / TILE) + 1;
+		int firstRow = (int)std::floor(worldTop   / TILE) - 1;
+		int lastRow  = (int)std::floor(worldBot   / TILE) + 1;
 
-		// Number of dirt rows below the grass surface (enough to cover bottom of screen)
-		int dirtRows = (int)std::ceil((screenH * 0.5f + (screenH * 0.5f - GROUND_Y_WORLD + camPos.y)) / TILE_SIZE) + 2;
-		if (dirtRows < 8) dirtRows = 8;  // floor: at least 8 rows worth of dirt below
+		if (firstCol < 0) firstCol = 0;
+		if (lastCol  >= World::WIDTH)  lastCol  = World::WIDTH  - 1;
+		if (firstRow < 0) firstRow = 0;
+		if (lastRow  >= World::HEIGHT) lastRow  = World::HEIGHT - 1;
 
-		for (int col = firstCol; col <= lastCol; col++)
+		for (int y = firstRow; y <= lastRow; y++)
 		{
-			float worldX = col * TILE_SIZE;
-
-			// Surface tile (grass) at top
-			CL_Vec2f surfaceWorldPos(worldX, GROUND_Y_WORLD);
-			CL_Vec2f surfaceScreenPos = m_camera.WorldToScreen(surfaceWorldPos);
-			rtRectf dstSurface(
-				surfaceScreenPos.x, surfaceScreenPos.y,
-				surfaceScreenPos.x + TILE_SIZE, surfaceScreenPos.y + TILE_SIZE
-			);
-			m_tileGrass.BlitEx(dstSurface, srcRect);
-
-			// Dirt fill rows below
-			for (int row = 1; row <= dirtRows; row++)
+			for (int x = firstCol; x <= lastCol; x++)
 			{
-				CL_Vec2f dirtWorldPos(worldX, GROUND_Y_WORLD + row * TILE_SIZE);
-				CL_Vec2f dirtScreenPos = m_camera.WorldToScreen(dirtWorldPos);
-				rtRectf dstDirt(
-					dirtScreenPos.x, dirtScreenPos.y,
-					dirtScreenPos.x + TILE_SIZE, dirtScreenPos.y + TILE_SIZE
-				);
-				m_tileDirt.BlitEx(dstDirt, srcRect);
+				const Cell& c = m_world.GetCell(x, y);
+				CL_Vec2f cellWorld = World::CellToWorld(x, y);
+				CL_Vec2f cellScreen = m_camera.WorldToScreen(cellWorld);
+				rtRectf dst(cellScreen.x, cellScreen.y,
+				            cellScreen.x + TILE, cellScreen.y + TILE);
+
+				// 1. BG layer (rendered first, darkened by overlay below)
+				if (c.bg.type != TILE_AIR)
+				{
+					Surface* bgSurf = GetTileSurface(c.bg.type);
+					if (bgSurf)
+					{
+						rtRectf src(0.0f, 0.0f, (float)bgSurf->GetWidth(), (float)bgSurf->GetHeight());
+						bgSurf->BlitEx(dst, src);
+						// Darken pass — translucent black overlay (~30% darken)
+						DrawFilledRect(dst.left, dst.top,
+						               dst.right - dst.left, dst.bottom - dst.top,
+						               MAKE_RGBA(0, 0, 0, 80));
+					}
+					else
+					{
+						// Fallback: dark gray rect if asset missing
+						DrawFilledRect(dst.left, dst.top, TILE, TILE, MAKE_RGBA(60, 60, 60, 255));
+					}
+				}
+
+				// 2. FG layer (drawn on top)
+				if (c.fg.type != TILE_AIR)
+				{
+					Surface* fgSurf = GetTileSurface(c.fg.type);
+					if (fgSurf)
+					{
+						rtRectf src(0.0f, 0.0f, (float)fgSurf->GetWidth(), (float)fgSurf->GetHeight());
+						fgSurf->BlitEx(dst, src);
+					}
+					else
+					{
+						// Fallback per type — bedrock gray, others magenta (visible "missing")
+						uint32 color = (c.fg.type == TILE_BEDROCK)
+						    ? MAKE_RGBA(50, 50, 50, 255)
+						    : MAKE_RGBA(255, 0, 255, 255);
+						DrawFilledRect(dst.left, dst.top, TILE, TILE, color);
+					}
+				}
 			}
 		}
 	}

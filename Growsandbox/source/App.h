@@ -10,6 +10,7 @@
 #include "BaseApp.h"
 #include "Player.h"
 #include "Camera.h"
+#include "World.h"
 
 class App: public BaseApp
 {
@@ -44,10 +45,9 @@ private:
 	bool m_inputRight;
 	bool m_inputJump;
 
-	// Phase 1.5c: ground tiles
-	Surface m_tileGrass;
-	Surface m_tileDirt;
-	bool m_tilesLoaded;
+	// Phase 2: tile world
+	World m_world;
+	bool m_worldGenerated;
 };
 
 
