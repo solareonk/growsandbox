@@ -84,24 +84,26 @@ void World::WorldToCell(const CL_Vec2f& w, int& x, int& y)
     y = (int)std::floor(w.y / (float)TILE_SIZE_PX);
 }
 
-bool World::PunchAt(int x, int y)
+TileTypeID World::PunchAt(int x, int y)
 {
-    if (!IsInBounds(x, y)) return false;
+    if (!IsInBounds(x, y)) return TILE_AIR;
     Cell& c = GetCell(x, y);
 
     // Priority: FG first; if FG is AIR, target BG
     Tile* target = (c.fg.type != TILE_AIR) ? &c.fg : &c.bg;
-    if (target->type == TILE_AIR) return false;          // nothing to punch
+    if (target->type == TILE_AIR) return TILE_AIR;          // nothing to punch
 
     const TileType& meta = GetTileType(target->type);
-    if (meta.maxHp == 0) return false;                    // unbreakable (bedrock)
+    if (meta.maxHp == 0) return TILE_AIR;                    // unbreakable (bedrock)
 
     if (target->hp > 0) target->hp--;
     if (target->hp == 0)
     {
+        TileTypeID brokenType = target->type;
         target->type = TILE_AIR;
+        return brokenType;  // Phase 3b: signal break to caller for inventory pickup
     }
-    return true;
+    return TILE_AIR;  // hit landed but didn't break (still has hp)
 }
 bool World::PlaceAt(int x, int y, TileTypeID type)
 {

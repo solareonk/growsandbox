@@ -57,10 +57,10 @@ void Interaction::Update(World& world,
         {
             if (selection.GetKind() == Selection::FIST)
             {
-                if (world.PunchAt(cx, cy))
-                {
-                    m_punchTimer = 0.0f;
-                }
+                TileTypeID broken = world.PunchAt(cx, cy);
+                // Pickup dispatch added in Task 4 — Task 3 just preserves no-pickup behavior
+                (void)broken;  // suppress unused-variable warning
+                m_punchTimer = 0.0f;
             }
             else // Selection::BLOCK
             {

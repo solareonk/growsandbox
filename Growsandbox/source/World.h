@@ -32,7 +32,7 @@ public:
     static CL_Vec2f CellToWorld(int x, int y);
     static void     WorldToCell(const CL_Vec2f& w, int& x, int& y);
 
-    bool PunchAt(int x, int y);
+    TileTypeID PunchAt(int x, int y);  // Phase 3b: returns broken tile type, TILE_AIR = no break
     bool PlaceAt(int x, int y, TileTypeID type);
 
 private:
