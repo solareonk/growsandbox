@@ -133,6 +133,9 @@
     <ClCompile Include="..\source\World.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\source\Inventory.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
     <ClCompile Include="..\source\Selection.cpp">
       <Filter>source</Filter>
     </ClCompile>
@@ -334,6 +337,9 @@
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\source\World.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\Inventory.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\source\Selection.h">
