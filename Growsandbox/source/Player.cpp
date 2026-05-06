@@ -10,7 +10,7 @@ static const float HEIGHT         = Player::HITBOX_HEIGHT;
 static const float GRAVITY        = 1500.0f;
 static const float MOVE_SPEED     = 300.0f;
 static const float JUMP_VELOCITY  = -550.0f;
-static const float MAX_FALL_SPEED = 1000.0f;  // terminal velocity — keeps dy/frame < TILE_SIZE_PX(36) at MAX_DELTA_TIME(1/30)
+static const float MAX_FALL_SPEED = 1000.0f;  // terminal velocity — keeps dy/frame < TILE_SIZE_PX at MAX_DELTA_TIME(1/30)
 static const float MAX_DELTA_TIME = 1.0f / 30.0f;
 
 // Phase 1.5b animation tuning
@@ -93,7 +93,7 @@ static void ResolveAxisY(CL_Vec2f& pos, CL_Vec2f& vel, bool& onGround, const Wor
 }
 
 Player::Player()
-    : m_position(50.0f * 36.0f, 22.0f * 36.0f)   // spawn col 50, row 22 = world (1800, 792); falls ~60px onto grass row 25
+    : m_position(50.0f * (float)World::TILE_SIZE_PX, 22.0f * (float)World::TILE_SIZE_PX)   // spawn col 50, row 22; falls ~60px onto grass row 25
     , m_velocity(0.0f, 0.0f)
     , m_onGround(false)
     , m_inputLeft(false)

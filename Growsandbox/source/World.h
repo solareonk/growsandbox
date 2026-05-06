@@ -24,7 +24,7 @@ class World
 public:
     static const int WIDTH = 100;
     static const int HEIGHT = 60;
-    static const int TILE_SIZE_PX = 36;
+    static const int TILE_SIZE_PX = 32;
 
     World();
 

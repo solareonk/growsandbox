@@ -704,7 +704,7 @@ void App::Draw()
 					Surface* crack = GetCrackOverlay();
 					if (crack)
 					{
-						const float FRAME_W = (float)World::TILE_SIZE_PX;  // 36 px
+						const float FRAME_W = (float)World::TILE_SIZE_PX;
 						const float FRAME_H = (float)World::TILE_SIZE_PX;
 						rtRectf src((float)stage * FRAME_W, 0.0f,
 						            ((float)stage + 1) * FRAME_W, FRAME_H);
