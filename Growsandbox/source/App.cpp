@@ -639,19 +639,15 @@ void App::Draw()
 				if (c.bg.type != TILE_AIR)
 				{
 					Surface* bgSurf = GetTileSurface(c.bg.type);
+					if (!bgSurf) bgSurf = GetTileSurface(TILE_DIRT);   // fallback to dirt atlas
 					if (bgSurf)
 					{
-						rtRectf src(0.0f, 0.0f, (float)bgSurf->GetWidth(), (float)bgSurf->GetHeight());
+						const float CELL = (float)World::TILE_SIZE_PX;
+						rtRectf src(0.0f, 0.0f, CELL, CELL);
 						bgSurf->BlitEx(dst, src);
-						// Darken pass — translucent black overlay (~30% darken)
 						DrawFilledRect(dst.left, dst.top,
 						               dst.right - dst.left, dst.bottom - dst.top,
 						               MAKE_RGBA(0, 0, 0, 80));
-					}
-					else
-					{
-						// Fallback: dark gray rect if asset missing
-						DrawFilledRect(dst.left, dst.top, TILE, TILE, MAKE_RGBA(60, 60, 60, 255));
 					}
 				}
 
@@ -659,18 +655,13 @@ void App::Draw()
 				if (c.fg.type != TILE_AIR)
 				{
 					Surface* fgSurf = GetTileSurface(c.fg.type);
+					// Fallback: any tile w/o its own asset → use dirt atlas cell (0,0)
+					if (!fgSurf) fgSurf = GetTileSurface(TILE_DIRT);
 					if (fgSurf)
 					{
-						rtRectf src(0.0f, 0.0f, (float)fgSurf->GetWidth(), (float)fgSurf->GetHeight());
+						const float CELL = (float)World::TILE_SIZE_PX;
+						rtRectf src(0.0f, 0.0f, CELL, CELL);
 						fgSurf->BlitEx(dst, src);
-					}
-					else
-					{
-						// Fallback per type — bedrock gray, others magenta (visible "missing")
-						uint32 color = (c.fg.type == TILE_BEDROCK)
-						    ? MAKE_RGBA(50, 50, 50, 255)
-						    : MAKE_RGBA(255, 0, 255, 255);
-						DrawFilledRect(dst.left, dst.top, TILE, TILE, color);
 					}
 				}
 
@@ -938,11 +929,13 @@ void App::DrawHotbar()
         {
             // Item slot — tile texture + count
             Surface* surf = GetTileSurface(s.type);
+            if (!surf) surf = GetTileSurface(TILE_DIRT);
             if (surf)
             {
+                const float CELL = (float)World::TILE_SIZE_PX;
                 rtRectf dst((float)(sx + 8), (float)(sy + 8),
                             (float)(sx + 8 + 32), (float)(sy + 8 + 32));
-                rtRectf src(0.0f, 0.0f, (float)surf->GetWidth(), (float)surf->GetHeight());
+                rtRectf src(0.0f, 0.0f, CELL, CELL);
                 surf->BlitEx(dst, src);
             }
             else
@@ -1015,11 +1008,13 @@ void App::DrawBackpack()
             if (s.type != TILE_AIR && s.count > 0)
             {
                 Surface* surf = GetTileSurface(s.type);
+                if (!surf) surf = GetTileSurface(TILE_DIRT);
                 if (surf)
                 {
+                    const float CELL = (float)World::TILE_SIZE_PX;
                     rtRectf dst((float)(sx + 8), (float)(sy + 8),
                                 (float)(sx + 8 + 32), (float)(sy + 8 + 32));
-                    rtRectf src(0.0f, 0.0f, (float)surf->GetWidth(), (float)surf->GetHeight());
+                    rtRectf src(0.0f, 0.0f, CELL, CELL);
                     surf->BlitEx(dst, src);
                 }
                 else
@@ -1058,17 +1053,14 @@ void App::DrawDrops()
         if (screenPos.y < -DROP_SIZE || screenPos.y > 768.0f)  continue;
 
         Surface* surf = GetTileSurface(d.type);
+        if (!surf) surf = GetTileSurface(TILE_DIRT);
         if (surf)
         {
+            const float CELL = (float)World::TILE_SIZE_PX;
             rtRectf dst(screenPos.x, screenPos.y,
                         screenPos.x + DROP_SIZE, screenPos.y + DROP_SIZE);
-            rtRectf src(0.0f, 0.0f, (float)surf->GetWidth(), (float)surf->GetHeight());
+            rtRectf src(0.0f, 0.0f, CELL, CELL);
             surf->BlitEx(dst, src);
-        }
-        else
-        {
-            DrawFilledRect(screenPos.x, screenPos.y, DROP_SIZE, DROP_SIZE,
-                           MAKE_RGBA(255, 0, 255, 255));
         }
     }
 }
