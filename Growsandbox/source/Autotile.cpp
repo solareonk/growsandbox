@@ -94,12 +94,86 @@ namespace
     //   1. Replace the sentinel entry below with your real entry.
     //   2. Change NUM_OVERRIDES to match the actual count.
     //   3. (When NUM_OVERRIDES > 0, Pass 2 in Init() will iterate the entries.)
+    // Atlas layout (8 cols x 6 rows of 32px cells, GL orientation = top-left at row 0).
+    // Cell index = row * 8 + col.
+    //
+    // Map derived by topology detection on tile_dirt.rttex pixel data + visual inspection.
+    // For formations not detected, hand-picked from atlas observation.
+    //
+    // Quartet decomposition:
+    //   Each cell of the cluster is split into 4 quarters (NW, NE, SW, SE corner).
+    //   A quarter has 5 possible visual states based on its 3 nearby connections:
+    //     Q_OUTER  - neither edge connected (rounded outer corner)
+    //     Q_EDGE_H - only horizontal edge (vertical-axis neighbor) connected
+    //     Q_EDGE_V - only vertical edge (horizontal-axis neighbor) connected
+    //     Q_INNER  - both edges connected, but diagonal corner is NOT (notch)
+    //     Q_INSIDE - corner + both edges connected (solid interior)
+    //   Note: edgeA = vertical-axis neighbor (N or S); edgeB = horizontal-axis (E or W).
+    //   So Q_EDGE_H = "horizontal-side edge present" = edgeA set, edgeB clear.
+    //   And Q_EDGE_V = "vertical-side edge present" = edgeA clear, edgeB set.
+    //
+    // Cardinal-edge formations (one side open):
+    //   Top-edge dirt (grass on top, mask 0x6e):       cell 1  (col 1, row 0)
+    //   Bottom-edge dirt (mask 0x9b):                  cell 5  (col 5, row 0) - TODO confirm visually
+    //   Left-edge dirt (W open, mask 0x37):            cell 3  (col 3, row 0)
+    //   Right-edge dirt (E open, mask 0xcd):           cell 4  (col 4, row 0)
+    //
+    // Outer-corner formations (two adjacent sides open):
+    //   Top-left of dirt mass (S+E+SE only):           cell 5  (col 5, row 0)
+    //   Top-right of dirt mass (S+W+SW only):          cell 6  (col 6, row 0)
+    //   Bottom-left of dirt mass (N+E+NE only):        cell 8  (col 0, row 1)
+    //   Bottom-right of dirt mass (N+W+NW only):       cell 7  (col 7, row 0)
+    //
+    // Pipes (two opposite sides connected, two open):
+    //   Vertical pipe top (S only):                    cell 10 (col 2, row 1)
+    //   Vertical pipe mid (N+S):                       cell 9  (col 1, row 1)
+    //   Vertical pipe bot (N only):                    cell 11 (col 3, row 1) - TODO
+    //   Horizontal pipe left (E only):                 cell 11 (col 3, row 1) - TODO
+    //   Horizontal pipe mid (E+W):                     cell 12 (col 4, row 1)
+    //   Horizontal pipe right (W only):                cell 12 (col 4, row 1) - TODO
+    //
+    // Inner-corner formations (one diagonal corner missing in otherwise-full mask):
+    //   NE corner missing (Q_INNER at NE):             cell 14 (col 6, row 1)
+    //   NW corner missing (Q_INNER at NW):             cell 13 (col 5, row 1)
+    //   SE corner missing (Q_INNER at SE):             cell 22 (col 6, row 2) - TODO confirm
+    //   SW corner missing (Q_INNER at SW):             cell 21 (col 5, row 2) - TODO confirm
+    //
+    // Fully surrounded interior:                       cell 19 (col 3, row 2) - plain dirt
     static const VisualOverride VISUAL_OVERRIDES[] =
     {
-        { { Q_OUTER, Q_OUTER, Q_OUTER, Q_OUTER }, 0 },  // SENTINEL — replace when adding real entries
-        // Task 9 entries go here; update NUM_OVERRIDES to match.
+        // === Cardinal edges ===
+        { { Q_EDGE_V, Q_EDGE_V, Q_INSIDE, Q_INSIDE }, 1 },   // top edge (N open)
+        { { Q_INSIDE, Q_INSIDE, Q_EDGE_V, Q_EDGE_V }, 5 },   // bottom edge (S open)  [hand-pick]
+        { { Q_EDGE_H, Q_INSIDE, Q_EDGE_H, Q_INSIDE }, 3 },   // left edge (W open)
+        { { Q_INSIDE, Q_EDGE_H, Q_INSIDE, Q_EDGE_H }, 4 },   // right edge (E open)
+
+        // === Outer corners (two adjacent sides open) ===
+        { { Q_OUTER, Q_EDGE_V, Q_EDGE_H, Q_INSIDE }, 5 },    // top-left corner (N+W open, S+E+SE present)
+        { { Q_EDGE_V, Q_OUTER, Q_INSIDE, Q_EDGE_H }, 6 },    // top-right corner (N+E open, S+W+SW present)
+        { { Q_EDGE_H, Q_INSIDE, Q_OUTER, Q_EDGE_V }, 8 },    // bot-left corner (S+W open, N+E+NE present)
+        { { Q_INSIDE, Q_EDGE_H, Q_EDGE_V, Q_OUTER }, 7 },    // bot-right corner (S+E open, N+W+NW present)
+
+        // === Pipes ===
+        { { Q_OUTER, Q_OUTER, Q_EDGE_H, Q_EDGE_H }, 10 },    // vert pipe top (S only)
+        { { Q_EDGE_H, Q_EDGE_H, Q_EDGE_H, Q_EDGE_H }, 9 },   // vert pipe mid (N+S)
+        { { Q_EDGE_H, Q_EDGE_H, Q_OUTER, Q_OUTER }, 11 },    // vert pipe bot (N only)
+        { { Q_OUTER, Q_EDGE_V, Q_OUTER, Q_EDGE_V }, 11 },    // horiz pipe left (E only)
+        { { Q_EDGE_V, Q_EDGE_V, Q_EDGE_V, Q_EDGE_V }, 12 },  // horiz pipe mid (E+W)
+        { { Q_EDGE_V, Q_OUTER, Q_EDGE_V, Q_OUTER }, 12 },    // horiz pipe right (W only)
+
+        // === Inner corners (full mass minus one diagonal) ===
+        { { Q_INSIDE, Q_INNER, Q_INSIDE, Q_INSIDE }, 14 },   // NE diagonal missing
+        { { Q_INNER, Q_INSIDE, Q_INSIDE, Q_INSIDE }, 13 },   // NW diagonal missing
+        { { Q_INSIDE, Q_INSIDE, Q_INSIDE, Q_INNER }, 22 },   // SE diagonal missing
+        { { Q_INSIDE, Q_INSIDE, Q_INNER, Q_INSIDE }, 21 },   // SW diagonal missing
+
+        // === Fully surrounded interior ===
+        { { Q_INSIDE, Q_INSIDE, Q_INSIDE, Q_INSIDE }, 19 },  // plain dirt (deep underground)
+
+        // === Isolated stub (all sides open) ===
+        { { Q_OUTER, Q_OUTER, Q_OUTER, Q_OUTER }, 12 },      // grass all around
     };
-    constexpr size_t NUM_OVERRIDES = 0;  // <-- KEEP IN SYNC with array length above
+    constexpr size_t NUM_OVERRIDES = 19;  // <-- KEEP IN SYNC with array length above
 
 } // anonymous namespace
 
