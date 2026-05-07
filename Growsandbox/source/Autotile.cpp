@@ -86,20 +86,20 @@ namespace
     // of whatever the first-seen algorithm picked." Filled during Task 9
     // by inspecting the atlas + identifying the actual cell for each formation.
     //
-    // Initially empty (NUM_OVERRIDES == 0) — algorithm assigns cells in
-    // first-seen iteration order.  Task 9 adds entries here as visual
-    // mismatches are found and corrected.
+    // IMPORTANT: When adding entries below, you MUST also update NUM_OVERRIDES.
+    // The sentinel-based approach exists because MSVC (C2466) rejects zero-length
+    // arrays; using sizeof() directly would count the sentinel as an entry.
     //
-    // MSVC does not allow a zero-length array, so we declare one sentinel
-    // entry and set NUM_OVERRIDES = 0 explicitly.  The sentinel is never
-    // iterated.
+    // To add a real override:
+    //   1. Replace the sentinel entry below with your real entry.
+    //   2. Change NUM_OVERRIDES to match the actual count.
+    //   3. (When NUM_OVERRIDES > 0, Pass 2 in Init() will iterate the entries.)
     static const VisualOverride VISUAL_OVERRIDES[] =
     {
-        // sentinel — never reached (NUM_OVERRIDES == 0)
-        { { Q_OUTER, Q_OUTER, Q_OUTER, Q_OUTER }, 0 },
+        { { Q_OUTER, Q_OUTER, Q_OUTER, Q_OUTER }, 0 },  // SENTINEL — replace when adding real entries
         // Task 9 entries go here; update NUM_OVERRIDES to match.
     };
-    constexpr size_t NUM_OVERRIDES = 0; // update when entries are added
+    constexpr size_t NUM_OVERRIDES = 0;  // <-- KEEP IN SYNC with array length above
 
 } // anonymous namespace
 
@@ -164,23 +164,23 @@ namespace Autotile
 
     bool SelfTest()
     {
-        // Invariant 1: all entries in valid range 0..46.
+        // Invariant 1: cell 47 (borrowed slot) is never produced.
+        for (int i = 0; i < 256; i++)
+        {
+            if (MASK_TO_VARIANT[i] == 47)
+            {
+                LogError("Autotile::SelfTest: MASK_TO_VARIANT[%d] = 47 (borrowed slot)", i);
+                return false;
+            }
+        }
+
+        // Invariant 2: all entries in valid range 0..46.
         for (int i = 0; i < 256; i++)
         {
             if (MASK_TO_VARIANT[i] > 46)
             {
                 LogError("Autotile::SelfTest: MASK_TO_VARIANT[%d] = %u (out of range 0..46)",
                          i, (unsigned)MASK_TO_VARIANT[i]);
-                return false;
-            }
-        }
-
-        // Invariant 2: cell 47 (borrowed) is never produced.
-        for (int i = 0; i < 256; i++)
-        {
-            if (MASK_TO_VARIANT[i] == 47)
-            {
-                LogError("Autotile::SelfTest: MASK_TO_VARIANT[%d] = 47 (borrowed slot)", i);
                 return false;
             }
         }
