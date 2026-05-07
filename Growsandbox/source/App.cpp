@@ -7,6 +7,7 @@
 #include "PlatformPrecomp.h"
 #include "App.h"
 #include "TileRegistry.h"
+#include "Autotile.h"
 #include "Entity/CustomInputComponent.h" //used for the back button (android)
 #include "Entity/FocusInputComponent.h" //needed to let the input component see input messages
 #include "Entity/ArcadeInputComponent.h"
@@ -165,6 +166,13 @@ bool App::Init()
 		ShowFatalError("Failed to load items.dat.\n\n"
 		               "Run: py script/encode_items.py\n"
 		               "Then re-launch.");
+		return false;
+	}
+
+	Autotile::Init();
+	if (!Autotile::SelfTest())
+	{
+		ShowFatalError("Autotile::SelfTest failed. See log for detail.");
 		return false;
 	}
 

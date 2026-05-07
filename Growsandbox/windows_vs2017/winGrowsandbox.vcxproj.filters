@@ -130,6 +130,9 @@
     <ClCompile Include="..\source\TileRegistry.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\source\Autotile.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
     <ClCompile Include="..\source\World.cpp">
       <Filter>source</Filter>
     </ClCompile>
@@ -331,6 +334,9 @@
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\source\TileRegistry.h">
+      <Filter>source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\Autotile.h">
       <Filter>source</Filter>
     </ClInclude>
     <ClInclude Include="..\source\World.h">
