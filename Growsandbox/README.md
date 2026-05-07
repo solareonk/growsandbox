@@ -56,7 +56,8 @@ This is the very early foundation of a long-term hobby project — a 2D MMO sand
 
 ## Roadmap (Future Phases — Separate Specs)
 
-- **Phase 3c** — Save persistence for player + world state (next)
+- ✅ **Phase 3c** — Autotile system (47-blob Wang tiles, 256-byte lookup, dirt + cave_background)
+- **Phase 3d** — Save persistence for player + world state (next)
 - **Phase 4** — Multiplayer networking via ENet
 - **Phase 5** — Multi-world hosting & accounts
 - **Phase 6+** — Game content, items, polish
