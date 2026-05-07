@@ -220,6 +220,10 @@ Surface* GetTileSurface(TileTypeID id)
         {
             LogError("TileRegistry: failed to load asset '%s' for tile %d", asset, (int)id);
         }
+        // Disable bilinear filtering — pixel-art tile atlases need nearest-neighbor
+        // sampling so that adjacent atlas cells don't bleed across cell boundaries
+        // when blitted side-by-side in the world.
+        if (s_surfaces[id].IsLoaded()) s_surfaces[id].SetSmoothing(false);
         s_surfaceLoaded[id] = true;
     }
     return s_surfaces[id].IsLoaded() ? &s_surfaces[id] : NULL;
