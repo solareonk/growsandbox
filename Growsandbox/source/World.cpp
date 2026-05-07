@@ -1,5 +1,6 @@
 #include "PlatformPrecomp.h"
 #include "World.h"
+#include "Autotile.h"
 #include <cmath>
 
 World::World()
@@ -8,60 +9,41 @@ World::World()
     {
         m_cells[i].fg = {TILE_AIR, 0};
         m_cells[i].bg = {TILE_AIR, 0};
+        m_cells[i].fg_variant = 0;
+        m_cells[i].bg_variant = 0;
     }
 }
 
 void World::GenerateInitial()
 {
+    const int GROUND_LEVEL = 25;   // same row Phase 2 used; tweak only if player spawn moves
+
     for (int y = 0; y < HEIGHT; y++)
     {
         for (int x = 0; x < WIDTH; x++)
         {
             Cell& c = GetCell(x, y);
-
-            // Sky
-            if (y < 25)
+            if (y < GROUND_LEVEL)
             {
                 c.fg = {TILE_AIR, 0};
                 c.bg = {TILE_AIR, 0};
-                continue;
             }
-
-            // Side walls — bedrock columns
-            if (x == 0 || x == WIDTH - 1)
+            else
             {
-                c.fg = {TILE_BEDROCK, 0};
-                c.bg = {TILE_BEDROCK, 0};
-                continue;
+                c.fg = {TILE_DIRT,    GetTileType(TILE_DIRT).maxHp};
+                c.bg = {TILE_CAVE_BG, GetTileType(TILE_CAVE_BG).maxHp};
             }
+        }
+    }
 
-            // Bottom row — bedrock floor
-            if (y == HEIGHT - 1)
-            {
-                c.fg = {TILE_BEDROCK, 0};
-                c.bg = {TILE_BEDROCK, 0};
-                continue;
-            }
-
-            // Grass surface (single row at y=25)
-            if (y == 25)
-            {
-                c.fg = {TILE_GRASS, GetTileType(TILE_GRASS).maxHp};
-                c.bg = {TILE_AIR, 0};
-                continue;
-            }
-
-            // Dirt strata (rows 26-44)
-            if (y < 45)
-            {
-                c.fg = {TILE_DIRT, GetTileType(TILE_DIRT).maxHp};
-                c.bg = {TILE_CAVE_WALL, GetTileType(TILE_CAVE_WALL).maxHp};
-                continue;
-            }
-
-            // Stone strata (rows 45-58)
-            c.fg = {TILE_STONE, GetTileType(TILE_STONE).maxHp};
-            c.bg = {TILE_CAVE_WALL, GetTileType(TILE_CAVE_WALL).maxHp};
+    // Phase 3c: bulk-recompute variants after world generation.
+    for (int y = 0; y < HEIGHT; y++)
+    {
+        for (int x = 0; x < WIDTH; x++)
+        {
+            Cell& c = GetCell(x, y);
+            c.fg_variant = Autotile::Compute(*this, x, y, true);
+            c.bg_variant = Autotile::Compute(*this, x, y, false);
         }
     }
 }
@@ -101,6 +83,7 @@ TileTypeID World::PunchAt(int x, int y)
     {
         TileTypeID brokenType = target->type;
         target->type = TILE_AIR;
+        RecomputeVariantsAround(x, y);
         return brokenType;  // Phase 3b: signal break to caller for inventory pickup
     }
     return TILE_AIR;  // hit landed but didn't break (still has hp)
@@ -108,7 +91,7 @@ TileTypeID World::PunchAt(int x, int y)
 bool World::PlaceAt(int x, int y, TileTypeID type)
 {
     if (!IsInBounds(x, y)) return false;
-    if (type == TILE_AIR || type == TILE_BEDROCK) return false;
+    if (type == TILE_AIR) return false;
 
     const TileType& meta = GetTileType(type);
     Cell& c = GetCell(x, y);
@@ -118,7 +101,25 @@ bool World::PlaceAt(int x, int y, TileTypeID type)
 
     targetSlot.type = type;
     targetSlot.hp   = meta.maxHp;
+    RecomputeVariantsAround(x, y);
     return true;
+}
+
+// Phase 3c: autotile variant recompute ----------------------------------------
+
+void World::RecomputeVariantsAround(int x, int y)
+{
+    for (int dy = -1; dy <= 1; dy++)
+    {
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            int nx = x + dx, ny = y + dy;
+            if (!IsInBounds(nx, ny)) continue;
+            Cell& c = GetCell(nx, ny);
+            c.fg_variant = Autotile::Compute(*this, nx, ny, true);
+            c.bg_variant = Autotile::Compute(*this, nx, ny, false);
+        }
+    }
 }
 
 // Phase 3b extension: floating drops -----------------------------------------

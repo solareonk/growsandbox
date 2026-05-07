@@ -18,7 +18,7 @@ static std::vector<Surface>      s_surfaces;
 static std::vector<bool>         s_surfaceLoaded;
 
 static const char* k_GsbxMagic = "GSBX";
-static const uint16_t k_GsbxExpectedVersion = 1;
+static const uint16_t k_GsbxExpectedVersion = 2;
 
 namespace
 {
@@ -140,6 +140,14 @@ bool TileRegistry_Load(const char* path)
             return false;
         }
 
+        uint8_t spreadType = 0, anchorCol = 0, anchorRow = 0;
+        if (!ReadN(f, &spreadType, 1) || !ReadN(f, &anchorCol, 1) || !ReadN(f, &anchorRow, 1))
+        {
+            LogError("TileRegistry_Load: malformed at item %u (autotile fields).", i);
+            fclose(f);
+            return false;
+        }
+
         TileType t = {};
         t.id = (TileTypeID)id;
         t.name = NULL;
@@ -150,6 +158,14 @@ bool TileRegistry_Load(const char* path)
         t.description = NULL;
         t.stackMax = stackMax;
         t.breakable = (breakable != 0);
+        if (spreadType != 1 && spreadType != 2)
+        {
+            LogError("TileRegistry_Load: item %u has unknown spread_type %u, defaulting to SPREAD_SINGLE.",
+                     i, (unsigned)spreadType);
+        }
+        t.spread_type = (spreadType == 2) ? SPREAD_SMART_EDGE : SPREAD_SINGLE;
+        t.anchor_col  = anchorCol;
+        t.anchor_row  = anchorRow;
         s_items.push_back(t);
     }
 
@@ -204,6 +220,10 @@ Surface* GetTileSurface(TileTypeID id)
         {
             LogError("TileRegistry: failed to load asset '%s' for tile %d", asset, (int)id);
         }
+        // Disable bilinear filtering — pixel-art tile atlases need nearest-neighbor
+        // sampling so that adjacent atlas cells don't bleed across cell boundaries
+        // when blitted side-by-side in the world.
+        if (s_surfaces[id].IsLoaded()) s_surfaces[id].SetSmoothing(false);
         s_surfaceLoaded[id] = true;
     }
     return s_surfaces[id].IsLoaded() ? &s_surfaces[id] : NULL;

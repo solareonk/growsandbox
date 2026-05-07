@@ -13,7 +13,7 @@ import os
 import struct
 import sys
 
-EXPECTED_VERSION = 1
+EXPECTED_VERSION = 2
 MAGIC = b"GSBX"
 
 LAYER_FG = 0
@@ -26,6 +26,7 @@ MAX_DESC_LEN = 255
 FIELD_NAMES = [
     "id", "name", "asset", "layer", "maxHp",
     "solid", "description", "stack_max", "breakable",
+    "spread_type", "anchor_col", "anchor_row",
 ]
 
 
@@ -139,6 +140,24 @@ def validate(items, version, count_declared, expected_version):
         if breakable not in ("0", "1"):
             fail(line_no, f"breakable must be 0 or 1, got {breakable!r}")
 
+        spread_type = item["spread_type"]
+        if spread_type not in ("1", "2"):
+            fail(line_no, f"spread_type must be 1 or 2, got {spread_type!r}")
+
+        try:
+            anchor_col = int(item["anchor_col"])
+        except ValueError:
+            fail(line_no, f"anchor_col not integer: {item['anchor_col']!r}")
+        if not (0 <= anchor_col <= 31):
+            fail(line_no, f"anchor_col out of range 0..31: {anchor_col}")
+
+        try:
+            anchor_row = int(item["anchor_row"])
+        except ValueError:
+            fail(line_no, f"anchor_row not integer: {item['anchor_row']!r}")
+        if not (0 <= anchor_row <= 31):
+            fail(line_no, f"anchor_row out of range 0..31: {anchor_row}")
+
 
 def write_binary(items, version, output_path):
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -164,6 +183,10 @@ def write_binary(items, version, output_path):
             f.write(struct.pack("<B", len(desc)))
             f.write(desc)
             f.write(struct.pack("<HB", stack_max, breakable))
+            spread_type = int(item["spread_type"])
+            anchor_col = int(item["anchor_col"])
+            anchor_row = int(item["anchor_row"])
+            f.write(struct.pack("<BBB", spread_type, anchor_col, anchor_row))
 
 
 def main():

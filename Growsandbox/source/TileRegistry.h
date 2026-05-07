@@ -3,15 +3,21 @@
 
 enum TileTypeID : uint8_t
 {
-    TILE_AIR        = 0,
-    TILE_GRASS      = 1,
-    TILE_DIRT       = 2,
-    TILE_STONE      = 3,
-    TILE_WOOD_PLANK = 4,
-    TILE_CAVE_WALL  = 5,
-    TILE_WOOD_WALL  = 6,
-    TILE_BEDROCK    = 7
+    TILE_AIR     = 0,
+    TILE_DIRT    = 1,
+    TILE_CAVE_BG = 2
     // TILE_TYPE_COUNT removed Phase 3a — use TileRegistry_GetCount() instead
+};
+
+// SpreadType values match the wire format in items.dat (1 = single, 2 = smart_edge).
+// Values start at 1 so a zero-initialized TileType (the GetTileType fallback) has
+// spread_type=0, which is intentionally not a valid enumerator — code reading
+// spread_type should always use a NEGATIVE check (e.g. `!= SPREAD_SMART_EDGE`)
+// for fallback safety, never a positive `== SPREAD_SINGLE` check.
+enum SpreadType : uint8_t
+{
+    SPREAD_SINGLE     = 1,
+    SPREAD_SMART_EDGE = 2,
 };
 
 struct TileType
@@ -25,7 +31,10 @@ struct TileType
     bool        solid;
     const char* description;  // Phase 3a: UI dialog text (Phase 6+ usage)
     uint16_t    stackMax;     // Phase 3a: inventory cap (0 = not stackable)
-    bool        breakable;    // Phase 3a: false = punch ignored (bedrock)
+    bool        breakable;    // false = punch ignored (currently unused — maxHp==0 is the unbreakability signal)
+    SpreadType  spread_type;  // Phase 3c: 1=single, 2=smart_edge (see SpreadType comment above)
+    uint8_t     anchor_col;   // Phase 3c: cluster anchor X within tile sheet (0..31, cells); encoder enforces range
+    uint8_t     anchor_row;   // Phase 3c: cluster anchor Y within tile sheet (0..31, cells); encoder enforces range
 };
 
 const TileType& GetTileType(TileTypeID id);

@@ -17,6 +17,8 @@ struct Cell
 {
     Tile fg;
     Tile bg;
+    uint8_t fg_variant;   // 0..46 for SMART_EDGE; 0 for SINGLE_FRAME
+    uint8_t bg_variant;
 };
 
 class World
@@ -39,6 +41,10 @@ public:
 
     TileTypeID PunchAt(int x, int y);  // Phase 3b: returns broken tile type, TILE_AIR = no break
     bool PlaceAt(int x, int y, TileTypeID type);
+
+    // Phase 3c: Recompute autotile variants for cell (x, y) and its 8 neighbors.
+    // Called automatically by PunchAt / PlaceAt / GenerateInitial.
+    void RecomputeVariantsAround(int x, int y);
 
     // Phase 3b extension: floating world drops
     void SpawnDrop(TileTypeID type, int cx, int cy);
