@@ -1,292 +1,122 @@
 // Growsandbox/source/Autotile.cpp
+//
+// 47-blob (Wang tile) autotile lookup. Given the 8 neighbors of a cell,
+// returns a cell index (0..47) into an 8x6 sprite atlas where same-typed
+// neighboring cells visually merge.
+//
+// The 256-byte MASK_TO_VARIANT table covers every 8-bit ortho+diagonal
+// permutation. The Wang-tile rule (a diagonal only "counts" when both
+// adjacent orthos are connected) is baked in: redundant bit configurations
+// resolve to the same cell. 47 cells are used; cell 47 (atlas (col=7, row=5))
+// is intentionally unused (47-tile arrangement leaves one cell free).
+
 #include "PlatformPrecomp.h"
 #include "Autotile.h"
 #include "World.h"
 
-// ---------------------------------------------------------------------------
-// Implementation helpers — hidden from other translation units.
-// ---------------------------------------------------------------------------
 namespace
 {
-    // Bit assignment per spec:
+    // Bit assignment.
     constexpr uint8_t MASK_N  = 0x01;
-    constexpr uint8_t MASK_E  = 0x02;
-    constexpr uint8_t MASK_S  = 0x04;
-    constexpr uint8_t MASK_W  = 0x08;
-    constexpr uint8_t MASK_NE = 0x10;
-    constexpr uint8_t MASK_SE = 0x20;
+    constexpr uint8_t MASK_S  = 0x02;
+    constexpr uint8_t MASK_W  = 0x04;
+    constexpr uint8_t MASK_E  = 0x08;
+    constexpr uint8_t MASK_NW = 0x10;
+    constexpr uint8_t MASK_NE = 0x20;
     constexpr uint8_t MASK_SW = 0x40;
-    constexpr uint8_t MASK_NW = 0x80;
+    constexpr uint8_t MASK_SE = 0x80;
 
-    // Corner-cleanup rule: a corner only counts as connected if both
-    // adjacent edges are also connected.
-    uint8_t CleanCorners(uint8_t raw)
-    {
-        if (!(raw & MASK_N) || !(raw & MASK_E)) raw &= ~MASK_NE;
-        if (!(raw & MASK_S) || !(raw & MASK_E)) raw &= ~MASK_SE;
-        if (!(raw & MASK_S) || !(raw & MASK_W)) raw &= ~MASK_SW;
-        if (!(raw & MASK_N) || !(raw & MASK_W)) raw &= ~MASK_NW;
-        return raw;
-    }
-
-    // ---------------------------------------------------------------------------
-    // Quarter decomposition
-    // ---------------------------------------------------------------------------
-
-    enum QuarterState : uint8_t
-    {
-        Q_OUTER  = 0,
-        Q_EDGE_H = 1,
-        Q_EDGE_V = 2,
-        Q_INNER  = 3,
-        Q_INSIDE = 4,
+    // Cell layout (row-major, 8x6 atlas):
+    //   cell_index = row * 8 + col
+    //   col = cell_index % 8,  row = cell_index / 8
+    //
+    // Hardcoded 256-entry lookup. Each table[mask] = cell_index in [0, 47).
+    // Generated from the Wang-tile algorithm output. Constant for all
+    // SMART_EDGE-style tiles; render code adds the per-tile atlas anchor.
+    static const uint8_t TABLE[256] = {
+        12, 11, 10,  9, 30, 44, 46, 36, 29, 43, 45, 33, 28, 42, 39, 27,
+        12, 11, 10,  9, 30,  8, 46, 35, 29, 43, 45, 33, 28, 41, 39, 23,
+        12, 11, 10,  9, 30, 44, 46, 36, 29,  7, 45, 32, 28, 40, 39, 24,
+        12, 11, 10,  9, 30,  8, 46, 35, 29,  7, 45, 32, 28,  2, 39, 18,
+        12, 11, 10,  9, 30, 44,  6, 34, 29, 43, 45, 33, 28, 42, 38, 25,
+        12, 11, 10,  9, 30,  8,  6,  4, 29, 43, 45, 33, 28, 41, 38, 20,
+        12, 11, 10,  9, 30, 44,  6, 34, 29,  7, 45, 32, 28, 40, 38, 21,
+        12, 11, 10,  9, 30,  8,  6,  4, 29,  7, 45, 32, 28,  2, 38, 16,
+        12, 11, 10,  9, 30, 44, 46, 36, 29, 43,  5, 31, 28, 42, 37, 26,
+        12, 11, 10,  9, 30,  8, 46, 35, 29, 43,  5, 31, 28, 41, 37, 22,
+        12, 11, 10,  9, 30, 44, 46, 36, 29,  7,  5,  3, 28, 40, 37, 19,
+        12, 11, 10,  9, 30,  8, 46, 35, 29,  7,  5,  3, 28,  2, 37, 15,
+        12, 11, 10,  9, 30, 44,  6, 34, 29, 43,  5, 31, 28, 42,  1, 17,
+        12, 11, 10,  9, 30,  8,  6,  4, 29, 43,  5, 31, 28, 41,  1, 14,
+        12, 11, 10,  9, 30, 44,  6, 34, 29,  7,  5,  3, 28, 40,  1, 13,
+        12, 11, 10,  9, 30,  8,  6,  4, 29,  7,  5,  3, 28,  2,  1,  0,
     };
-
-    // Compute the 4 quarter states from a cleaned 8-bit mask.
-    // Order: NW, NE, SW, SE.
-    void DecomposeQuarters(uint8_t cleaned, QuarterState q[4])
-    {
-        bool n_NW = (cleaned & MASK_N)  != 0;
-        bool w_NW = (cleaned & MASK_W)  != 0;
-        bool d_NW = (cleaned & MASK_NW) != 0;
-        bool n_NE = (cleaned & MASK_N)  != 0;
-        bool e_NE = (cleaned & MASK_E)  != 0;
-        bool d_NE = (cleaned & MASK_NE) != 0;
-        bool s_SW = (cleaned & MASK_S)  != 0;
-        bool w_SW = (cleaned & MASK_W)  != 0;
-        bool d_SW = (cleaned & MASK_SW) != 0;
-        bool s_SE = (cleaned & MASK_S)  != 0;
-        bool e_SE = (cleaned & MASK_E)  != 0;
-        bool d_SE = (cleaned & MASK_SE) != 0;
-
-        // edgeA = the axis-aligned edge that is "primary" for this quarter,
-        // edgeB = the other axis-aligned edge, diagonal = corner bit.
-        // For NW quarter: north edge (horizontal) and west edge (vertical).
-        // For NE quarter: north edge (horizontal) and east edge (vertical).
-        // For SW quarter: south edge (horizontal) and west edge (vertical).
-        // For SE quarter: south edge (horizontal) and east edge (vertical).
-        auto classify = [](bool edgeA, bool edgeB, bool diagonal) -> QuarterState
-        {
-            if (!edgeA && !edgeB) return Q_OUTER;
-            if ( edgeA && !edgeB) return Q_EDGE_H;
-            if (!edgeA &&  edgeB) return Q_EDGE_V;
-            return diagonal ? Q_INSIDE : Q_INNER;
-        };
-
-        q[0] = classify(n_NW, w_NW, d_NW);  // NW
-        q[1] = classify(n_NE, e_NE, d_NE);  // NE
-        q[2] = classify(s_SW, w_SW, d_SW);  // SW
-        q[3] = classify(s_SE, e_SE, d_SE);  // SE
-    }
-
-    struct VisualOverride { uint8_t q[4]; uint8_t cell; };
-
-    // Visual overrides applied AFTER algorithmic assignment.
-    // Each entry says: "for this specific quartet, use THIS cell index instead
-    // of whatever the first-seen algorithm picked." Filled during Task 9
-    // by inspecting the atlas + identifying the actual cell for each formation.
-    //
-    // IMPORTANT: When adding entries below, you MUST also update NUM_OVERRIDES.
-    // The sentinel-based approach exists because MSVC (C2466) rejects zero-length
-    // arrays; using sizeof() directly would count the sentinel as an entry.
-    //
-    // To add a real override:
-    //   1. Replace the sentinel entry below with your real entry.
-    //   2. Change NUM_OVERRIDES to match the actual count.
-    //   3. (When NUM_OVERRIDES > 0, Pass 2 in Init() will iterate the entries.)
-    // Atlas layout (8 cols x 6 rows of 32px cells, GL orientation = top-left at row 0).
-    // Cell index = row * 8 + col.
-    //
-    // Map derived by topology detection on tile_dirt.rttex pixel data + visual inspection.
-    // For formations not detected, hand-picked from atlas observation.
-    //
-    // Quartet decomposition:
-    //   Each cell of the cluster is split into 4 quarters (NW, NE, SW, SE corner).
-    //   A quarter has 5 possible visual states based on its 3 nearby connections:
-    //     Q_OUTER  - neither edge connected (rounded outer corner)
-    //     Q_EDGE_H - only horizontal edge (vertical-axis neighbor) connected
-    //     Q_EDGE_V - only vertical edge (horizontal-axis neighbor) connected
-    //     Q_INNER  - both edges connected, but diagonal corner is NOT (notch)
-    //     Q_INSIDE - corner + both edges connected (solid interior)
-    //   Note: edgeA = vertical-axis neighbor (N or S); edgeB = horizontal-axis (E or W).
-    //   So Q_EDGE_H = "horizontal-side edge present" = edgeA set, edgeB clear.
-    //   And Q_EDGE_V = "vertical-side edge present" = edgeA clear, edgeB set.
-    //
-    // Cardinal-edge formations (one side open):
-    //   Top-edge dirt (grass on top, mask 0x6e):       cell 1  (col 1, row 0)
-    //   Bottom-edge dirt (mask 0x9b):                  cell 5  (col 5, row 0) - TODO confirm visually
-    //   Left-edge dirt (W open, mask 0x37):            cell 3  (col 3, row 0)
-    //   Right-edge dirt (E open, mask 0xcd):           cell 4  (col 4, row 0)
-    //
-    // Outer-corner formations (two adjacent sides open):
-    //   Top-left of dirt mass (S+E+SE only):           cell 5  (col 5, row 0)
-    //   Top-right of dirt mass (S+W+SW only):          cell 6  (col 6, row 0)
-    //   Bottom-left of dirt mass (N+E+NE only):        cell 8  (col 0, row 1)
-    //   Bottom-right of dirt mass (N+W+NW only):       cell 7  (col 7, row 0)
-    //
-    // Pipes (two opposite sides connected, two open):
-    //   Vertical pipe top (S only):                    cell 10 (col 2, row 1)
-    //   Vertical pipe mid (N+S):                       cell 9  (col 1, row 1)
-    //   Vertical pipe bot (N only):                    cell 11 (col 3, row 1) - TODO
-    //   Horizontal pipe left (E only):                 cell 11 (col 3, row 1) - TODO
-    //   Horizontal pipe mid (E+W):                     cell 12 (col 4, row 1)
-    //   Horizontal pipe right (W only):                cell 12 (col 4, row 1) - TODO
-    //
-    // Inner-corner formations (one diagonal corner missing in otherwise-full mask):
-    //   NE corner missing (Q_INNER at NE):             cell 14 (col 6, row 1)
-    //   NW corner missing (Q_INNER at NW):             cell 13 (col 5, row 1)
-    //   SE corner missing (Q_INNER at SE):             cell 22 (col 6, row 2) - TODO confirm
-    //   SW corner missing (Q_INNER at SW):             cell 21 (col 5, row 2) - TODO confirm
-    //
-    // Fully surrounded interior:                       cell 19 (col 3, row 2) - plain dirt
-    static const VisualOverride VISUAL_OVERRIDES[] =
-    {
-        // === Cardinal edges ===
-        { { Q_EDGE_V, Q_EDGE_V, Q_INSIDE, Q_INSIDE }, 1 },   // top edge (N open)
-        { { Q_INSIDE, Q_INSIDE, Q_EDGE_V, Q_EDGE_V }, 5 },   // bottom edge (S open)  [hand-pick]
-        { { Q_EDGE_H, Q_INSIDE, Q_EDGE_H, Q_INSIDE }, 3 },   // left edge (W open)
-        { { Q_INSIDE, Q_EDGE_H, Q_INSIDE, Q_EDGE_H }, 4 },   // right edge (E open)
-
-        // === Outer corners (two adjacent sides open) ===
-        { { Q_OUTER, Q_EDGE_V, Q_EDGE_H, Q_INSIDE }, 5 },    // top-left corner (N+W open, S+E+SE present)
-        { { Q_EDGE_V, Q_OUTER, Q_INSIDE, Q_EDGE_H }, 6 },    // top-right corner (N+E open, S+W+SW present)
-        { { Q_EDGE_H, Q_INSIDE, Q_OUTER, Q_EDGE_V }, 8 },    // bot-left corner (S+W open, N+E+NE present)
-        { { Q_INSIDE, Q_EDGE_H, Q_EDGE_V, Q_OUTER }, 7 },    // bot-right corner (S+E open, N+W+NW present)
-
-        // === Pipes ===
-        { { Q_OUTER, Q_OUTER, Q_EDGE_H, Q_EDGE_H }, 10 },    // vert pipe top (S only)
-        { { Q_EDGE_H, Q_EDGE_H, Q_EDGE_H, Q_EDGE_H }, 9 },   // vert pipe mid (N+S)
-        { { Q_EDGE_H, Q_EDGE_H, Q_OUTER, Q_OUTER }, 11 },    // vert pipe bot (N only)
-        { { Q_OUTER, Q_EDGE_V, Q_OUTER, Q_EDGE_V }, 11 },    // horiz pipe left (E only)
-        { { Q_EDGE_V, Q_EDGE_V, Q_EDGE_V, Q_EDGE_V }, 12 },  // horiz pipe mid (E+W)
-        { { Q_EDGE_V, Q_OUTER, Q_EDGE_V, Q_OUTER }, 12 },    // horiz pipe right (W only)
-
-        // === Inner corners (full mass minus one diagonal) ===
-        { { Q_INSIDE, Q_INNER, Q_INSIDE, Q_INSIDE }, 14 },   // NE diagonal missing
-        { { Q_INNER, Q_INSIDE, Q_INSIDE, Q_INSIDE }, 13 },   // NW diagonal missing
-        { { Q_INSIDE, Q_INSIDE, Q_INSIDE, Q_INNER }, 22 },   // SE diagonal missing
-        { { Q_INSIDE, Q_INSIDE, Q_INNER, Q_INSIDE }, 21 },   // SW diagonal missing
-
-        // === Fully surrounded interior ===
-        { { Q_INSIDE, Q_INSIDE, Q_INSIDE, Q_INSIDE }, 19 },  // plain dirt (deep underground)
-
-        // === Isolated stub (all sides open) ===
-        { { Q_OUTER, Q_OUTER, Q_OUTER, Q_OUTER }, 12 },      // grass all around
-    };
-    constexpr size_t NUM_OVERRIDES = 19;  // <-- KEEP IN SYNC with array length above
-
 } // anonymous namespace
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 namespace Autotile
 {
     uint8_t MASK_TO_VARIANT[256] = { 0 };
 
     void Init()
     {
-        for (int i = 0; i < 256; i++) MASK_TO_VARIANT[i] = 0;
-
-        // Pass 1: algorithmic assignment.
-        // Encode quartet as a key in [0, 625): q0*125 + q1*25 + q2*5 + q3.
-        static const int KEY_RANGE = 5 * 5 * 5 * 5;
-        uint8_t cellByQuartet[KEY_RANGE];
-        for (int i = 0; i < KEY_RANGE; i++) cellByQuartet[i] = 255;
-
-        auto encodeKey = [](const QuarterState q[4]) -> int
-        {
-            return q[0] * 125 + q[1] * 25 + q[2] * 5 + q[3];
-        };
-
-        uint8_t nextCell = 0;
-        for (int raw = 0; raw < 256; raw++)
-        {
-            uint8_t cleaned = CleanCorners((uint8_t)raw);
-            QuarterState q[4];
-            DecomposeQuarters(cleaned, q);
-            int key = encodeKey(q);
-
-            if (cellByQuartet[key] == 255)
-            {
-                if (nextCell == 47) nextCell++;     // skip borrowed slot
-                cellByQuartet[key] = nextCell++;
-            }
-            MASK_TO_VARIANT[raw] = cellByQuartet[key];
-        }
-
-        // Pass 2: apply visual overrides.
-        for (size_t i = 0; i < NUM_OVERRIDES; i++)
-        {
-            QuarterState q[4] = {
-                (QuarterState)VISUAL_OVERRIDES[i].q[0],
-                (QuarterState)VISUAL_OVERRIDES[i].q[1],
-                (QuarterState)VISUAL_OVERRIDES[i].q[2],
-                (QuarterState)VISUAL_OVERRIDES[i].q[3],
-            };
-            int key = encodeKey(q);
-            uint8_t newCell = VISUAL_OVERRIDES[i].cell;
-            for (int raw = 0; raw < 256; raw++)
-            {
-                uint8_t cleaned = CleanCorners((uint8_t)raw);
-                QuarterState rq[4];
-                DecomposeQuarters(cleaned, rq);
-                if (encodeKey(rq) == key) MASK_TO_VARIANT[raw] = newCell;
-            }
-        }
+        memcpy(MASK_TO_VARIANT, TABLE, 256);
     }
 
     bool SelfTest()
     {
-        // Invariant 1: cell 47 (borrowed slot) is never produced.
-        for (int i = 0; i < 256; i++)
-        {
-            if (MASK_TO_VARIANT[i] == 47)
-            {
-                LogError("Autotile::SelfTest: MASK_TO_VARIANT[%d] = 47 (borrowed slot)", i);
-                return false;
-            }
-        }
-
-        // Invariant 2: all entries in valid range 0..46.
-        for (int i = 0; i < 256; i++)
-        {
-            if (MASK_TO_VARIANT[i] > 46)
-            {
-                LogError("Autotile::SelfTest: MASK_TO_VARIANT[%d] = %u (out of range 0..46)",
-                         i, (unsigned)MASK_TO_VARIANT[i]);
-                return false;
-            }
-        }
-
-        // Invariant 3: at least 47 - NUM_OVERRIDES distinct cells.
-        bool seen[47] = { false };
-        int distinctCount = 0;
+        // All entries must be in [0, 47]. Cell 47 itself is never returned
+        // (the unused atlas slot — 47-tile arrangement leaves one free).
         for (int i = 0; i < 256; i++)
         {
             uint8_t v = MASK_TO_VARIANT[i];
-            if (!seen[v]) { seen[v] = true; distinctCount++; }
+            if (v >= 47)
+            {
+                LogError("Autotile::SelfTest: MASK_TO_VARIANT[%d] = %u (out of range)",
+                         i, (unsigned)v);
+                return false;
+            }
         }
-        int minExpected = 47 - (int)NUM_OVERRIDES;
-        if (distinctCount < minExpected)
+
+        // Spot-check known reference points:
+        struct Check { uint8_t mask; uint8_t expected; const char* label; };
+        const Check checks[] = {
+            { 0,                                        12, "isolated (no neighbors)" },
+            { 0xFF,                                      0, "fully surrounded" },
+            { 0xFF & ~MASK_NW,                          13, "missing NW corner" },
+            { 0xFF & ~MASK_NE,                          14, "missing NE corner" },
+            { 0xFF & ~MASK_SW,                          15, "missing SW corner" },
+            { 0xFF & ~MASK_SE,                          16, "missing SE corner" },
+            { uint8_t(MASK_N),                          11, "N only" },
+            { uint8_t(MASK_S),                          10, "S only" },
+            { uint8_t(MASK_W),                          30, "W only" },
+            { uint8_t(MASK_E),                          29, "E only" },
+        };
+        for (const Check& c : checks)
         {
-            LogError("Autotile::SelfTest: only %d distinct cells, expected at least %d",
-                     distinctCount, minExpected);
+            if (MASK_TO_VARIANT[c.mask] != c.expected)
+            {
+                LogError("Autotile::SelfTest: mask 0x%02X (%s): expected %u, got %u",
+                         (unsigned)c.mask, c.label,
+                         (unsigned)c.expected, (unsigned)MASK_TO_VARIANT[c.mask]);
+                return false;
+            }
+        }
+
+        // Distinct-cell count.
+        bool seen[48] = { false };
+        int distinct = 0;
+        for (int i = 0; i < 256; i++)
+        {
+            uint8_t v = MASK_TO_VARIANT[i];
+            if (!seen[v]) { seen[v] = true; distinct++; }
+        }
+        if (distinct != 47)
+        {
+            LogError("Autotile::SelfTest: %d distinct cells, expected 47", distinct);
             return false;
         }
 
-        // Invariant 4: deterministic.
-        uint8_t snapshot[256];
-        memcpy(snapshot, MASK_TO_VARIANT, 256);
-        Init();
-        if (memcmp(snapshot, MASK_TO_VARIANT, 256) != 0)
-        {
-            LogError("Autotile::SelfTest: Init() is not deterministic.");
-            return false;
-        }
-
-        LogMsg("Autotile::SelfTest passed (256 entries, %d distinct cells, range 0..46, deterministic).",
-               distinctCount);
+        LogMsg("Autotile::SelfTest passed (256 entries, 47 distinct cells, 10 spot checks).");
         return true;
     }
 
@@ -296,31 +126,30 @@ namespace Autotile
 
         const Cell& center = world.GetCell(x, y);
         TileTypeID centerType = fg_layer ? center.fg.type : center.bg.type;
-
-        // Not SMART_EDGE-capable → variant 0 (renders as anchor cell).
         if (centerType == TILE_AIR) return 0;
         const TileType& centerMeta = GetTileType(centerType);
         if (centerMeta.spread_type != SPREAD_SMART_EDGE) return 0;
 
         auto isConnected = [&](int nx, int ny) -> bool
         {
-            // Boundary-as-connected: out-of-bounds neighbors count as same-type.
+            // Boundary-as-connected: out-of-bounds neighbors count as same-type
+            // so tiles at the world edge don't render as if exposed to sky.
             if (!world.IsInBounds(nx, ny)) return true;
             const Cell& n = world.GetCell(nx, ny);
             TileTypeID neighborType = fg_layer ? n.fg.type : n.bg.type;
             return neighborType == centerType;
         };
 
-        uint8_t raw = 0;
-        if (isConnected(x,     y - 1)) raw |= MASK_N;
-        if (isConnected(x + 1, y    )) raw |= MASK_E;
-        if (isConnected(x,     y + 1)) raw |= MASK_S;
-        if (isConnected(x - 1, y    )) raw |= MASK_W;
-        if (isConnected(x + 1, y - 1)) raw |= MASK_NE;
-        if (isConnected(x + 1, y + 1)) raw |= MASK_SE;
-        if (isConnected(x - 1, y + 1)) raw |= MASK_SW;
-        if (isConnected(x - 1, y - 1)) raw |= MASK_NW;
+        uint8_t mask = 0;
+        if (isConnected(x,     y - 1)) mask |= MASK_N;
+        if (isConnected(x,     y + 1)) mask |= MASK_S;
+        if (isConnected(x - 1, y    )) mask |= MASK_W;
+        if (isConnected(x + 1, y    )) mask |= MASK_E;
+        if (isConnected(x - 1, y - 1)) mask |= MASK_NW;
+        if (isConnected(x + 1, y - 1)) mask |= MASK_NE;
+        if (isConnected(x - 1, y + 1)) mask |= MASK_SW;
+        if (isConnected(x + 1, y + 1)) mask |= MASK_SE;
 
-        return MASK_TO_VARIANT[raw];
+        return MASK_TO_VARIANT[mask];
     }
 }
