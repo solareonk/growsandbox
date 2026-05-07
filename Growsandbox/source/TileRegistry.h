@@ -9,6 +9,12 @@ enum TileTypeID : uint8_t
     // TILE_TYPE_COUNT removed Phase 3a — use TileRegistry_GetCount() instead
 };
 
+enum SpreadType : uint8_t
+{
+    SPREAD_SINGLE     = 1,
+    SPREAD_SMART_EDGE = 2,
+};
+
 struct TileType
 {
     TileTypeID  id;
@@ -20,7 +26,10 @@ struct TileType
     bool        solid;
     const char* description;  // Phase 3a: UI dialog text (Phase 6+ usage)
     uint16_t    stackMax;     // Phase 3a: inventory cap (0 = not stackable)
-    bool        breakable;    // Phase 3a: false = punch ignored (bedrock)
+    bool        breakable;    // false = punch ignored (currently unused — maxHp==0 is the unbreakability signal)
+    SpreadType  spread_type;  // NEW: 1=single, 2=smart_edge
+    uint8_t     anchor_col;   // NEW: cluster anchor X within tile sheet (cells)
+    uint8_t     anchor_row;   // NEW: cluster anchor Y within tile sheet (cells)
 };
 
 const TileType& GetTileType(TileTypeID id);

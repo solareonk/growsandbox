@@ -1,9 +1,9 @@
 //Growsandbox Item Registry
-//Format: add_item\id\name\asset\layer\maxHp\solid\description\stack_max\breakable
+//Format: add_item\id\name\asset\layer\maxHp\solid\description\stack_max\breakable\spread_type\anchor_col\anchor_row
 
-version\1
+version\2
 itemCount\3
 
-add_item\0\air\\FG\0\0\Empty space.\0\0
-add_item\1\dirt\tile_dirt.rttex\FG\3\1\Plain dirt.\999\1
-add_item\2\cave_background\tile_cavebackground.rttex\BG\2\0\Background dirt.\999\1
+add_item\0\air\\FG\0\0\Empty space.\0\0\1\0\0
+add_item\1\dirt\tile_dirt.rttex\FG\3\1\Plain dirt.\999\1\2\0\0
+add_item\2\cave_background\tile_cavebackground.rttex\BG\2\0\Background dirt.\999\1\2\0\0
