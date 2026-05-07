@@ -39,6 +39,12 @@ for (const line of lines) {
     const isWater = /^water(_ray)?\.rttex$/i.test(texture);
     if (!isTilePage && !isWater) { skipped++; continue; }
 
+    // Skip seeds — share spritesheet with their parent block but aren't
+    // placeable as world tiles. 99.99% have action_type=19; one outlier
+    // uses action_type=37 (caught by the name suffix check).
+    const actionType = parseInt(f[FIELD.action_type], 10);
+    if (actionType === 19 || name.endsWith(" Seed")) { skipped++; continue; }
+
     // Skip duplicates (later definition wins is unusual; first wins is fine)
     if (data[name]) { skipped++; continue; }
 
