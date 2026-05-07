@@ -639,7 +639,6 @@ void App::Draw()
 				if (c.bg.type != TILE_AIR)
 				{
 					Surface* bgSurf = GetTileSurface(c.bg.type);
-					if (!bgSurf) bgSurf = GetTileSurface(TILE_DIRT);   // fallback to dirt atlas
 					if (bgSurf)
 					{
 						const float CELL = (float)World::TILE_SIZE_PX;
@@ -655,8 +654,6 @@ void App::Draw()
 				if (c.fg.type != TILE_AIR)
 				{
 					Surface* fgSurf = GetTileSurface(c.fg.type);
-					// Fallback: any tile w/o its own asset → use dirt atlas cell (0,0)
-					if (!fgSurf) fgSurf = GetTileSurface(TILE_DIRT);
 					if (fgSurf)
 					{
 						const float CELL = (float)World::TILE_SIZE_PX;
@@ -929,7 +926,6 @@ void App::DrawHotbar()
         {
             // Item slot — tile texture + count
             Surface* surf = GetTileSurface(s.type);
-            if (!surf) surf = GetTileSurface(TILE_DIRT);
             if (surf)
             {
                 const float CELL = (float)World::TILE_SIZE_PX;
@@ -1008,7 +1004,6 @@ void App::DrawBackpack()
             if (s.type != TILE_AIR && s.count > 0)
             {
                 Surface* surf = GetTileSurface(s.type);
-                if (!surf) surf = GetTileSurface(TILE_DIRT);
                 if (surf)
                 {
                     const float CELL = (float)World::TILE_SIZE_PX;
@@ -1053,7 +1048,6 @@ void App::DrawDrops()
         if (screenPos.y < -DROP_SIZE || screenPos.y > 768.0f)  continue;
 
         Surface* surf = GetTileSurface(d.type);
-        if (!surf) surf = GetTileSurface(TILE_DIRT);
         if (surf)
         {
             const float CELL = (float)World::TILE_SIZE_PX;

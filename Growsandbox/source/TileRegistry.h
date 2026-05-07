@@ -3,14 +3,9 @@
 
 enum TileTypeID : uint8_t
 {
-    TILE_AIR        = 0,
-    TILE_GRASS      = 1,
-    TILE_DIRT       = 2,
-    TILE_STONE      = 3,
-    TILE_WOOD_PLANK = 4,
-    TILE_CAVE_WALL  = 5,
-    TILE_WOOD_WALL  = 6,
-    TILE_BEDROCK    = 7
+    TILE_AIR     = 0,
+    TILE_DIRT    = 1,
+    TILE_CAVE_BG = 2
     // TILE_TYPE_COUNT removed Phase 3a — use TileRegistry_GetCount() instead
 };
 

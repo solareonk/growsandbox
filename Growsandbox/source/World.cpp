@@ -13,55 +13,23 @@ World::World()
 
 void World::GenerateInitial()
 {
+    const int GROUND_LEVEL = 25;   // same row Phase 2 used; tweak only if player spawn moves
+
     for (int y = 0; y < HEIGHT; y++)
     {
         for (int x = 0; x < WIDTH; x++)
         {
             Cell& c = GetCell(x, y);
-
-            // Sky
-            if (y < 25)
+            if (y < GROUND_LEVEL)
             {
                 c.fg = {TILE_AIR, 0};
                 c.bg = {TILE_AIR, 0};
-                continue;
             }
-
-            // Side walls — bedrock columns
-            if (x == 0 || x == WIDTH - 1)
+            else
             {
-                c.fg = {TILE_BEDROCK, 0};
-                c.bg = {TILE_BEDROCK, 0};
-                continue;
+                c.fg = {TILE_DIRT,    GetTileType(TILE_DIRT).maxHp};
+                c.bg = {TILE_CAVE_BG, GetTileType(TILE_CAVE_BG).maxHp};
             }
-
-            // Bottom row — bedrock floor
-            if (y == HEIGHT - 1)
-            {
-                c.fg = {TILE_BEDROCK, 0};
-                c.bg = {TILE_BEDROCK, 0};
-                continue;
-            }
-
-            // Grass surface (single row at y=25)
-            if (y == 25)
-            {
-                c.fg = {TILE_GRASS, GetTileType(TILE_GRASS).maxHp};
-                c.bg = {TILE_AIR, 0};
-                continue;
-            }
-
-            // Dirt strata (rows 26-44)
-            if (y < 45)
-            {
-                c.fg = {TILE_DIRT, GetTileType(TILE_DIRT).maxHp};
-                c.bg = {TILE_CAVE_WALL, GetTileType(TILE_CAVE_WALL).maxHp};
-                continue;
-            }
-
-            // Stone strata (rows 45-58)
-            c.fg = {TILE_STONE, GetTileType(TILE_STONE).maxHp};
-            c.bg = {TILE_CAVE_WALL, GetTileType(TILE_CAVE_WALL).maxHp};
         }
     }
 }
@@ -108,7 +76,7 @@ TileTypeID World::PunchAt(int x, int y)
 bool World::PlaceAt(int x, int y, TileTypeID type)
 {
     if (!IsInBounds(x, y)) return false;
-    if (type == TILE_AIR || type == TILE_BEDROCK) return false;
+    if (type == TILE_AIR) return false;
 
     const TileType& meta = GetTileType(type);
     Cell& c = GetCell(x, y);
