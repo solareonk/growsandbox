@@ -216,9 +216,37 @@ namespace Autotile
         return true;
     }
 
-    uint8_t Compute(const World& /*world*/, int /*x*/, int /*y*/, bool /*fg_layer*/)
+    uint8_t Compute(const World& world, int x, int y, bool fg_layer)
     {
-        // TODO Task 6: real implementation
-        return 0;
+        if (!world.IsInBounds(x, y)) return 0;
+
+        const Cell& center = world.GetCell(x, y);
+        TileTypeID centerType = fg_layer ? center.fg.type : center.bg.type;
+
+        // Not SMART_EDGE-capable → variant 0 (renders as anchor cell).
+        if (centerType == TILE_AIR) return 0;
+        const TileType& centerMeta = GetTileType(centerType);
+        if (centerMeta.spread_type != SPREAD_SMART_EDGE) return 0;
+
+        auto isConnected = [&](int nx, int ny) -> bool
+        {
+            // Boundary-as-connected: out-of-bounds neighbors count as same-type.
+            if (!world.IsInBounds(nx, ny)) return true;
+            const Cell& n = world.GetCell(nx, ny);
+            TileTypeID neighborType = fg_layer ? n.fg.type : n.bg.type;
+            return neighborType == centerType;
+        };
+
+        uint8_t raw = 0;
+        if (isConnected(x,     y - 1)) raw |= MASK_N;
+        if (isConnected(x + 1, y    )) raw |= MASK_E;
+        if (isConnected(x,     y + 1)) raw |= MASK_S;
+        if (isConnected(x - 1, y    )) raw |= MASK_W;
+        if (isConnected(x + 1, y - 1)) raw |= MASK_NE;
+        if (isConnected(x + 1, y + 1)) raw |= MASK_SE;
+        if (isConnected(x - 1, y + 1)) raw |= MASK_SW;
+        if (isConnected(x - 1, y - 1)) raw |= MASK_NW;
+
+        return MASK_TO_VARIANT[raw];
     }
 }
