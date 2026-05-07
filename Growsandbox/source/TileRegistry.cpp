@@ -158,6 +158,11 @@ bool TileRegistry_Load(const char* path)
         t.description = NULL;
         t.stackMax = stackMax;
         t.breakable = (breakable != 0);
+        if (spreadType != 1 && spreadType != 2)
+        {
+            LogError("TileRegistry_Load: item %u has unknown spread_type %u, defaulting to SPREAD_SINGLE.",
+                     i, (unsigned)spreadType);
+        }
         t.spread_type = (spreadType == 2) ? SPREAD_SMART_EDGE : SPREAD_SINGLE;
         t.anchor_col  = anchorCol;
         t.anchor_row  = anchorRow;
