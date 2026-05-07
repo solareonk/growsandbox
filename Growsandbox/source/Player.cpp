@@ -171,6 +171,33 @@ void Player::Update(float deltaTime)
         m_walkAnimTimer = 0.0f;
         m_walkFrameToggle = false;
     }
+
+    // Phase 3c: world-bounds clamp (replaces bedrock border).
+    const float worldW = (float)World::WIDTH  * (float)World::TILE_SIZE_PX;
+    const float worldH = (float)World::HEIGHT * (float)World::TILE_SIZE_PX;
+
+    if (m_position.x < 0.0f)
+    {
+        m_position.x = 0.0f;
+        m_velocity.x = 0.0f;
+    }
+    else if (m_position.x + WIDTH > worldW)
+    {
+        m_position.x = worldW - WIDTH;
+        m_velocity.x = 0.0f;
+    }
+
+    if (m_position.y < 0.0f)
+    {
+        m_position.y = 0.0f;
+        m_velocity.y = 0.0f;
+    }
+    else if (m_position.y + HEIGHT > worldH)
+    {
+        m_position.y = worldH - HEIGHT;
+        m_velocity.y = 0.0f;
+        m_onGround   = true;
+    }
 }
 
 void Player::Draw(const Camera &camera)
