@@ -155,24 +155,9 @@ void Player::Update(float deltaTime)
     m_onGround = false;
     ResolveAxisY(m_position, m_velocity, m_onGround, m_pWorld);
 
-    // 6. Walk animation timer cycling
-    if (m_onGround && m_velocity.x != 0.0f)
-    {
-        m_walkAnimTimer += deltaTime;
-        if (m_walkAnimTimer >= WALK_FRAME_DURATION)
-        {
-            m_walkAnimTimer = 0.0f;
-            m_walkFrameToggle = !m_walkFrameToggle;
-        }
-    }
-    else
-    {
-        // Reset walk timer when not walking so first walk frame is consistent
-        m_walkAnimTimer = 0.0f;
-        m_walkFrameToggle = false;
-    }
-
     // Phase 3c: world-bounds clamp (replaces bedrock border).
+    // Must run BEFORE the walk-animation block so m_onGround is correct when
+    // the player first hits the bottom world edge (not caught by tile collision).
     const float worldW = (float)World::WIDTH  * (float)World::TILE_SIZE_PX;
     const float worldH = (float)World::HEIGHT * (float)World::TILE_SIZE_PX;
 
@@ -196,7 +181,24 @@ void Player::Update(float deltaTime)
     {
         m_position.y = worldH - HEIGHT;
         m_velocity.y = 0.0f;
-        m_onGround   = true;
+        m_onGround   = true;  // bottom world edge acts as solid ground (no water/void mechanic yet)
+    }
+
+    // 6. Walk animation timer cycling
+    if (m_onGround && m_velocity.x != 0.0f)
+    {
+        m_walkAnimTimer += deltaTime;
+        if (m_walkAnimTimer >= WALK_FRAME_DURATION)
+        {
+            m_walkAnimTimer = 0.0f;
+            m_walkFrameToggle = !m_walkFrameToggle;
+        }
+    }
+    else
+    {
+        // Reset walk timer when not walking so first walk frame is consistent
+        m_walkAnimTimer = 0.0f;
+        m_walkFrameToggle = false;
     }
 }
 
