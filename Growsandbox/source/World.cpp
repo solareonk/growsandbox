@@ -1,5 +1,6 @@
 #include "PlatformPrecomp.h"
 #include "World.h"
+#include "Autotile.h"
 #include <cmath>
 
 World::World()
@@ -8,6 +9,8 @@ World::World()
     {
         m_cells[i].fg = {TILE_AIR, 0};
         m_cells[i].bg = {TILE_AIR, 0};
+        m_cells[i].fg_variant = 0;
+        m_cells[i].bg_variant = 0;
     }
 }
 
@@ -30,6 +33,17 @@ void World::GenerateInitial()
                 c.fg = {TILE_DIRT,    GetTileType(TILE_DIRT).maxHp};
                 c.bg = {TILE_CAVE_BG, GetTileType(TILE_CAVE_BG).maxHp};
             }
+        }
+    }
+
+    // Phase 3c: bulk-recompute variants after world generation.
+    for (int y = 0; y < HEIGHT; y++)
+    {
+        for (int x = 0; x < WIDTH; x++)
+        {
+            Cell& c = GetCell(x, y);
+            c.fg_variant = Autotile::Compute(*this, x, y, true);
+            c.bg_variant = Autotile::Compute(*this, x, y, false);
         }
     }
 }
@@ -69,6 +83,7 @@ TileTypeID World::PunchAt(int x, int y)
     {
         TileTypeID brokenType = target->type;
         target->type = TILE_AIR;
+        RecomputeVariantsAround(x, y);
         return brokenType;  // Phase 3b: signal break to caller for inventory pickup
     }
     return TILE_AIR;  // hit landed but didn't break (still has hp)
@@ -86,7 +101,25 @@ bool World::PlaceAt(int x, int y, TileTypeID type)
 
     targetSlot.type = type;
     targetSlot.hp   = meta.maxHp;
+    RecomputeVariantsAround(x, y);
     return true;
+}
+
+// Phase 3c: autotile variant recompute ----------------------------------------
+
+void World::RecomputeVariantsAround(int x, int y)
+{
+    for (int dy = -1; dy <= 1; dy++)
+    {
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            int nx = x + dx, ny = y + dy;
+            if (!IsInBounds(nx, ny)) continue;
+            Cell& c = GetCell(nx, ny);
+            c.fg_variant = Autotile::Compute(*this, nx, ny, true);
+            c.bg_variant = Autotile::Compute(*this, nx, ny, false);
+        }
+    }
 }
 
 // Phase 3b extension: floating drops -----------------------------------------
