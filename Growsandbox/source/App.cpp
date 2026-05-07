@@ -649,8 +649,13 @@ void App::Draw()
 					Surface* bgSurf = GetTileSurface(c.bg.type);
 					if (bgSurf)
 					{
+						const TileType& tt = GetTileType(c.bg.type);
 						const float CELL = (float)World::TILE_SIZE_PX;
-						rtRectf src(0.0f, 0.0f, CELL, CELL);
+						int cellIdx = c.bg_variant;
+						int srcCol = tt.anchor_col + (cellIdx % 8);
+						int srcRow = tt.anchor_row + (cellIdx / 8);
+						rtRectf src((float)srcCol * CELL, (float)srcRow * CELL,
+						            (float)(srcCol + 1) * CELL, (float)(srcRow + 1) * CELL);
 						bgSurf->BlitEx(dst, src);
 						DrawFilledRect(dst.left, dst.top,
 						               dst.right - dst.left, dst.bottom - dst.top,
@@ -664,8 +669,13 @@ void App::Draw()
 					Surface* fgSurf = GetTileSurface(c.fg.type);
 					if (fgSurf)
 					{
+						const TileType& tt = GetTileType(c.fg.type);
 						const float CELL = (float)World::TILE_SIZE_PX;
-						rtRectf src(0.0f, 0.0f, CELL, CELL);
+						int cellIdx = c.fg_variant;
+						int srcCol = tt.anchor_col + (cellIdx % 8);
+						int srcRow = tt.anchor_row + (cellIdx / 8);
+						rtRectf src((float)srcCol * CELL, (float)srcRow * CELL,
+						            (float)(srcCol + 1) * CELL, (float)(srcRow + 1) * CELL);
 						fgSurf->BlitEx(dst, src);
 					}
 				}
@@ -936,10 +946,14 @@ void App::DrawHotbar()
             Surface* surf = GetTileSurface(s.type);
             if (surf)
             {
+                const TileType& tt = GetTileType(s.type);
                 const float CELL = (float)World::TILE_SIZE_PX;
+                int srcCol = tt.anchor_col;
+                int srcRow = tt.anchor_row;
                 rtRectf dst((float)(sx + 8), (float)(sy + 8),
                             (float)(sx + 8 + 32), (float)(sy + 8 + 32));
-                rtRectf src(0.0f, 0.0f, CELL, CELL);
+                rtRectf src((float)srcCol * CELL, (float)srcRow * CELL,
+                            (float)(srcCol + 1) * CELL, (float)(srcRow + 1) * CELL);
                 surf->BlitEx(dst, src);
             }
             else
@@ -1014,10 +1028,14 @@ void App::DrawBackpack()
                 Surface* surf = GetTileSurface(s.type);
                 if (surf)
                 {
+                    const TileType& tt = GetTileType(s.type);
                     const float CELL = (float)World::TILE_SIZE_PX;
+                    int srcCol = tt.anchor_col;
+                    int srcRow = tt.anchor_row;
                     rtRectf dst((float)(sx + 8), (float)(sy + 8),
                                 (float)(sx + 8 + 32), (float)(sy + 8 + 32));
-                    rtRectf src(0.0f, 0.0f, CELL, CELL);
+                    rtRectf src((float)srcCol * CELL, (float)srcRow * CELL,
+                                (float)(srcCol + 1) * CELL, (float)(srcRow + 1) * CELL);
                     surf->BlitEx(dst, src);
                 }
                 else
@@ -1058,10 +1076,14 @@ void App::DrawDrops()
         Surface* surf = GetTileSurface(d.type);
         if (surf)
         {
+            const TileType& tt = GetTileType(d.type);
             const float CELL = (float)World::TILE_SIZE_PX;
+            int srcCol = tt.anchor_col;
+            int srcRow = tt.anchor_row;
             rtRectf dst(screenPos.x, screenPos.y,
                         screenPos.x + DROP_SIZE, screenPos.y + DROP_SIZE);
-            rtRectf src(0.0f, 0.0f, CELL, CELL);
+            rtRectf src((float)srcCol * CELL, (float)srcRow * CELL,
+                        (float)(srcCol + 1) * CELL, (float)(srcRow + 1) * CELL);
             surf->BlitEx(dst, src);
         }
     }
