@@ -291,5 +291,61 @@ namespace
 
 // Stubs — full implementations follow in later tasks.
 bool SaveManager::TryLoad(World&, Inventory&, Player&) { return false; }
-bool SaveManager::Save   (const World&, const Inventory&, const Player&) { return false; }
+bool SaveManager::Save(const World& world, const Inventory& inv, const Player& player)
+{
+    // 1. Build buffer in memory.
+    std::vector<uint8_t> buf = SerializeToBuffer(world, inv, player);
+
+    const std::string tmp   = TmpPath();
+    const std::string final_ = SavePath();
+
+    // 2. Write to temp file with fsync.
+    FILE* fp = fopen(tmp.c_str(), "wb");
+    if (!fp)
+    {
+        LogError("Save: fopen(%s) failed: %s", tmp.c_str(), strerror(errno));
+        return false;
+    }
+    size_t written = fwrite(buf.data(), 1, buf.size(), fp);
+    if (written != buf.size())
+    {
+        LogError("Save: fwrite short (%zu/%zu)", written, buf.size());
+        fclose(fp);
+        return false;
+    }
+    fflush(fp);
+#ifdef _WIN32
+    if (_commit(_fileno(fp)) != 0)
+    {
+        LogError("Save: _commit failed: %s", strerror(errno));
+        // continue anyway — best effort
+    }
+#else
+    if (fsync(fileno(fp)) != 0)
+    {
+        LogError("Save: fsync failed: %s", strerror(errno));
+    }
+#endif
+    fclose(fp);
+
+    // 3. Atomic rename over existing target.
+#ifdef _WIN32
+    BOOL ok = MoveFileExA(tmp.c_str(), final_.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    if (!ok)
+    {
+        LogError("Save: MoveFileExA(%s -> %s) failed: %lu",
+                 tmp.c_str(), final_.c_str(), (unsigned long)GetLastError());
+        return false;
+    }
+#else
+    if (rename(tmp.c_str(), final_.c_str()) != 0)
+    {
+        LogError("Save: rename(%s -> %s) failed: %s",
+                 tmp.c_str(), final_.c_str(), strerror(errno));
+        return false;
+    }
+#endif
+
+    return true;
+}
 void SaveManager::SelfTest() { LogMsg("SaveManager::SelfTest stub"); }
