@@ -37,15 +37,7 @@ void World::GenerateInitial()
     }
 
     // Phase 3c: bulk-recompute variants after world generation.
-    for (int y = 0; y < HEIGHT; y++)
-    {
-        for (int x = 0; x < WIDTH; x++)
-        {
-            Cell& c = GetCell(x, y);
-            c.fg_variant = Autotile::Compute(*this, x, y, true);
-            c.bg_variant = Autotile::Compute(*this, x, y, false);
-        }
-    }
+    RecomputeAllVariants();
 }
 
 Cell& World::GetCell(int x, int y)        { return m_cells[y * WIDTH + x]; }
@@ -206,5 +198,18 @@ void World::UpdateDrops(float dt, const Player& player, Inventory& inv)
         }
 
         ++i;
+    }
+}
+
+void World::RecomputeAllVariants()
+{
+    for (int y = 0; y < HEIGHT; y++)
+    {
+        for (int x = 0; x < WIDTH; x++)
+        {
+            Cell& c = GetCell(x, y);
+            c.fg_variant = Autotile::Compute(*this, x, y, true);
+            c.bg_variant = Autotile::Compute(*this, x, y, false);
+        }
     }
 }

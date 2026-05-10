@@ -206,3 +206,13 @@ TileTypeID Inventory::GetSelectedTile() const
     if (s.type == TILE_AIR || s.count == 0) return TILE_AIR;
     return s.type;
 }
+
+void Inventory::SetFromSerialized(const InventorySlot* hotbarIn,
+                                   const InventorySlot* backpackIn,
+                                   int selectedSlot)
+{
+    for (int i = 0; i < HOTBAR_SLOTS; i++)   m_hotbar[i]   = hotbarIn[i];
+    for (int i = 0; i < BACKPACK_SLOTS; i++) m_backpack[i] = backpackIn[i];
+    m_selectedHotbarSlot = selectedSlot;
+    m_backpackOpen       = false;   // UI transient — always closed on load
+}

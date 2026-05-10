@@ -8,6 +8,7 @@
 #include "App.h"
 #include "TileRegistry.h"
 #include "Autotile.h"
+#include "SaveManager.h"
 #include "Entity/CustomInputComponent.h" //used for the back button (android)
 #include "Entity/FocusInputComponent.h" //needed to let the input component see input messages
 #include "Entity/ArcadeInputComponent.h"
@@ -176,12 +177,20 @@ bool App::Init()
 		return false;
 	}
 
+	// Phase 3d: validate save serializer at startup.
+	SaveManager::SelfTest();
+
 	GetBaseApp()->SetFPSVisible(true);
 	return true;
 }
 
 void App::Kill()
 {
+	// Phase 3d: persist state before shutdown. Failure logs but does not block close.
+	if (m_worldGenerated)
+	{
+		SaveManager::Save(m_world, m_inventory, m_player);
+	}
 	TileRegistry_Shutdown();
 	if (g_crackOverlayLoaded)
 	{
@@ -357,6 +366,23 @@ void AppInputRawKeyboard(VariantList *pVList)
         case '5':
             if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(4);
             keyName = "5 (slot 4)";
+            break;
+        case VIRTUAL_KEY_F5:
+            if (keyInfo == VIRTUAL_KEY_PRESS)
+            {
+                if (GetApp()->IsWorldGenerated())
+                {
+                    bool ok = SaveManager::Save(GetApp()->GetWorld(),
+                                                 GetApp()->GetInventory(),
+                                                 GetApp()->GetPlayer());
+                    LogMsg(ok ? "Manual save OK" : "Manual save FAILED");
+                }
+                else
+                {
+                    LogMsg("Manual save skipped (world not yet initialized)");
+                }
+            }
+            keyName = "F5 (Save)";
             break;
         case 'R':
         case 'r':
@@ -560,7 +586,11 @@ void App::Update()
 
 	if (!m_worldGenerated)
 	{
-		m_world.GenerateInitial();
+		// Phase 3d: try to load saved state; fall back to fresh world if no save exists.
+		if (!SaveManager::TryLoad(m_world, m_inventory, m_player))
+		{
+			m_world.GenerateInitial();
+		}
 		m_player.SetWorld(&m_world);
 		m_worldGenerated = true;
 	}
@@ -801,9 +831,12 @@ void App::OnScreenSizeChange()
 
 void App::OnEnterBackground()
 {
-	//save your game stuff here, as on some devices (Android <cough>) we never get another notification of quitting.
-	LogMsg("Entered background");
 	BaseApp::OnEnterBackground();
+	// Phase 3d: mobile lifecycle save (home button, screen lock, etc.)
+	if (m_worldGenerated)
+	{
+		SaveManager::Save(m_world, m_inventory, m_player);
+	}
 }
 
 void App::OnEnterForeground()

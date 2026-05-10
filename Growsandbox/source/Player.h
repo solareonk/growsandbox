@@ -22,6 +22,12 @@ public:
     CL_Vec2f GetVelocity() const { return m_velocity; }
     bool IsOnGround() const { return m_onGround; }
 
+    // Phase 3d save: restore position and facing from save file.
+    // SetPosition resets velocity to {0,0} and onGround to false (physics re-derives next tick).
+    void SetPosition(const CL_Vec2f& pos);
+    void SetFacing(bool facingRight) { m_facingRight = facingRight; }
+    bool GetFacing() const { return m_facingRight; }
+
 private:
     CL_Vec2f m_position;
     CL_Vec2f m_velocity;

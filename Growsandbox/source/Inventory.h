@@ -52,6 +52,13 @@ public:
     // Reset to initial state (called by R key)
     void Clear();
 
+    // Phase 3d save: restore inventory from save file.
+    // hotbarIn must point to HOTBAR_SLOTS entries; backpackIn to BACKPACK_SLOTS.
+    // selectedSlot must be in [0, HOTBAR_SLOTS-1]. Resets backpack-open UI state.
+    void SetFromSerialized(const InventorySlot* hotbarIn,
+                           const InventorySlot* backpackIn,
+                           int selectedSlot);
+
 private:
     InventorySlot m_hotbar[HOTBAR_SLOTS];
     InventorySlot m_backpack[BACKPACK_SLOTS];
