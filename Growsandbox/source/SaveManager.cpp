@@ -6,6 +6,7 @@
 #include "TileRegistry.h"
 #include <vector>
 #include <cassert>
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -211,8 +212,8 @@ namespace
         float py = ReadF32(buf.data() + off + 4);
         uint8_t facing = ReadU8(buf.data() + off + 8);
         // off + 9 = reserved
-        const float worldMaxX = (float)(World::WIDTH  * World::TILE_SIZE_PX);
-        const float worldMaxY = (float)(World::HEIGHT * World::TILE_SIZE_PX);
+        const float worldMaxX = (float)(World::WIDTH  * World::TILE_SIZE_PX) - Player::HITBOX_WIDTH;
+        const float worldMaxY = (float)(World::HEIGHT * World::TILE_SIZE_PX) - Player::HITBOX_HEIGHT;
         if (px < 0.0f || px > worldMaxX || py < 0.0f || py > worldMaxY)
             FatalSave("save corrupt: player position out of bounds (%.1f, %.1f)", px, py);
         p.SetPosition(CL_Vec2f(px, py));
@@ -298,8 +299,12 @@ bool SaveManager::TryLoad(World& world, Inventory& inv, Player& player)
     FILE* fp = fopen(path.c_str(), "rb");
     if (!fp)
     {
-        LogMsg("SaveManager: no save file at %s — fresh start", path.c_str());
-        return false;   // NORMAL fresh start, NOT an error
+        if (errno == ENOENT)
+        {
+            LogMsg("SaveManager: no save file at %s — fresh start", path.c_str());
+            return false;   // NORMAL fresh start, NOT an error
+        }
+        FatalSave("Cannot open save.dat (%s): %s", path.c_str(), strerror(errno));
     }
 
     // Read full file.
@@ -376,6 +381,7 @@ bool SaveManager::Save(const World& world, const Inventory& inv, const Player& p
     {
         LogError("Save: MoveFileExA(%s -> %s) failed: %lu",
                  tmp.c_str(), final_.c_str(), (unsigned long)GetLastError());
+        DeleteFileA(tmp.c_str());   // best-effort cleanup of leftover tmp
         return false;
     }
 #else
@@ -383,6 +389,7 @@ bool SaveManager::Save(const World& world, const Inventory& inv, const Player& p
     {
         LogError("Save: rename(%s -> %s) failed: %s",
                  tmp.c_str(), final_.c_str(), strerror(errno));
+        unlink(tmp.c_str());        // best-effort cleanup of leftover tmp
         return false;
     }
 #endif
@@ -431,10 +438,20 @@ void SaveManager::SelfTest()
         LogError("SaveManager::SelfTest: cell (50,30) fg.type should be AIR");
         assert(!"cell punch mismatch");
     }
+    if (w2.GetCell(60, 30).bg.type != TILE_CAVE_BG)
+    {
+        LogError("SaveManager::SelfTest: cell (60,30) bg.type should be CAVE_BG (round-trip preserved)");
+        assert(!"bg cell mismatch");
+    }
     if (w2.GetDrops().size() != 1)
     {
         LogError("SaveManager::SelfTest: drops count != 1 (got %zu)", w2.GetDrops().size());
         assert(!"drops count mismatch");
+    }
+    if (w2.GetDrops()[0].type != TILE_DIRT)
+    {
+        LogError("SaveManager::SelfTest: drop[0] type mismatch (expected DIRT)");
+        assert(!"drop type mismatch");
     }
     // Verify inventory.
     if (inv2.GetHotbarSlot(2).count != 7 || inv2.GetHotbarSlot(2).type != TILE_DIRT)
