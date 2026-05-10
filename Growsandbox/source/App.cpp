@@ -186,6 +186,11 @@ bool App::Init()
 
 void App::Kill()
 {
+	// Phase 3d: persist state before shutdown. Failure logs but does not block close.
+	if (m_worldGenerated)
+	{
+		SaveManager::Save(m_world, m_inventory, m_player);
+	}
 	TileRegistry_Shutdown();
 	if (g_crackOverlayLoaded)
 	{
@@ -809,9 +814,12 @@ void App::OnScreenSizeChange()
 
 void App::OnEnterBackground()
 {
-	//save your game stuff here, as on some devices (Android <cough>) we never get another notification of quitting.
-	LogMsg("Entered background");
 	BaseApp::OnEnterBackground();
+	// Phase 3d: mobile lifecycle save (home button, screen lock, etc.)
+	if (m_worldGenerated)
+	{
+		SaveManager::Save(m_world, m_inventory, m_player);
+	}
 }
 
 void App::OnEnterForeground()
