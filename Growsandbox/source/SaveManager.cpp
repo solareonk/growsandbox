@@ -5,6 +5,7 @@
 #include "Player.h"
 #include "TileRegistry.h"
 #include <vector>
+#include <cassert>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -388,4 +389,81 @@ bool SaveManager::Save(const World& world, const Inventory& inv, const Player& p
 
     return true;
 }
-void SaveManager::SelfTest() { LogMsg("SaveManager::SelfTest stub"); }
+void SaveManager::SelfTest()
+{
+    // Build deterministic test pattern.
+    World w; Inventory inv; Player p;
+    w.GenerateInitial();
+    w.PunchAt(50, 30);                       // remove a tile
+    w.PlaceAt(60, 30, TILE_DIRT);            // place a tile
+    w.SpawnDrop(TILE_DIRT, 70, 25);          // floating drop
+
+    InventorySlot hotbarTest[Inventory::HOTBAR_SLOTS] = {};
+    InventorySlot bpTest[Inventory::BACKPACK_SLOTS]   = {};
+    hotbarTest[2].type = TILE_DIRT; hotbarTest[2].count = 7;
+    bpTest[0].type     = TILE_DIRT; bpTest[0].count     = 99;
+    inv.SetFromSerialized(hotbarTest, bpTest, 2);
+
+    p.SetPosition(CL_Vec2f(123.5f, 456.25f));
+    p.SetFacing(false);
+
+    // Round-trip through buffer.
+    std::vector<uint8_t> buf = SerializeToBuffer(w, inv, p);
+
+    World w2; Inventory inv2; Player p2;
+    w2.GenerateInitial();   // ensure non-empty starting state to verify load overwrites
+    bool ok = DeserializeFromBuffer(buf, w2, inv2, p2);
+    if (!ok)
+    {
+        LogError("SaveManager::SelfTest: deserialize returned false");
+        assert(!"SaveManager SelfTest deserialize failed");
+        return;
+    }
+
+    // Verify world cell + drop survived.
+    if (w2.GetCell(60, 30).fg.type != TILE_DIRT)
+    {
+        LogError("SaveManager::SelfTest: cell (60,30) fg.type mismatch");
+        assert(!"cell mismatch");
+    }
+    if (w2.GetCell(50, 30).fg.type != TILE_AIR)
+    {
+        LogError("SaveManager::SelfTest: cell (50,30) fg.type should be AIR");
+        assert(!"cell punch mismatch");
+    }
+    if (w2.GetDrops().size() != 1)
+    {
+        LogError("SaveManager::SelfTest: drops count != 1 (got %zu)", w2.GetDrops().size());
+        assert(!"drops count mismatch");
+    }
+    // Verify inventory.
+    if (inv2.GetHotbarSlot(2).count != 7 || inv2.GetHotbarSlot(2).type != TILE_DIRT)
+    {
+        LogError("SaveManager::SelfTest: hotbar slot 2 mismatch");
+        assert(!"hotbar mismatch");
+    }
+    if (inv2.GetBackpackSlot(0).count != 99)
+    {
+        LogError("SaveManager::SelfTest: backpack slot 0 count mismatch");
+        assert(!"backpack mismatch");
+    }
+    if (inv2.GetSelectedHotbarSlot() != 2)
+    {
+        LogError("SaveManager::SelfTest: selected slot mismatch");
+        assert(!"selected mismatch");
+    }
+    // Verify player.
+    if (p2.GetPosition().x != 123.5f || p2.GetPosition().y != 456.25f)
+    {
+        LogError("SaveManager::SelfTest: player position mismatch (%.2f, %.2f)",
+                 p2.GetPosition().x, p2.GetPosition().y);
+        assert(!"player pos mismatch");
+    }
+    if (p2.GetFacing() != false)
+    {
+        LogError("SaveManager::SelfTest: player facing mismatch");
+        assert(!"player facing mismatch");
+    }
+
+    LogMsg("SaveManager::SelfTest passed (%zu bytes)", buf.size());
+}
