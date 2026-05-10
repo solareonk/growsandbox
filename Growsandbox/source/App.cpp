@@ -8,6 +8,7 @@
 #include "App.h"
 #include "TileRegistry.h"
 #include "Autotile.h"
+#include "SaveManager.h"
 #include "Entity/CustomInputComponent.h" //used for the back button (android)
 #include "Entity/FocusInputComponent.h" //needed to let the input component see input messages
 #include "Entity/ArcadeInputComponent.h"
@@ -175,6 +176,9 @@ bool App::Init()
 		ShowFatalError("Autotile::SelfTest failed. See log for detail.");
 		return false;
 	}
+
+	// Phase 3d: validate save serializer at startup.
+	SaveManager::SelfTest();
 
 	GetBaseApp()->SetFPSVisible(true);
 	return true;
@@ -560,7 +564,11 @@ void App::Update()
 
 	if (!m_worldGenerated)
 	{
-		m_world.GenerateInitial();
+		// Phase 3d: try to load saved state; fall back to fresh world if no save exists.
+		if (!SaveManager::TryLoad(m_world, m_inventory, m_player))
+		{
+			m_world.GenerateInitial();
+		}
 		m_player.SetWorld(&m_world);
 		m_worldGenerated = true;
 	}
