@@ -160,8 +160,133 @@ namespace
         return buf;
     }
 
-    // Forward declaration for deserialize internal (defined later in file).
-    bool DeserializeFromBuffer(const std::vector<uint8_t>& buf, World& w, Inventory& inv, Player& p);
+    bool DeserializeFromBuffer(const std::vector<uint8_t>& buf, World& w, Inventory& inv, Player& p)
+    {
+        const size_t size = buf.size();
+
+        // 1. Header
+        if (size < HEADER_BYTES)
+            FatalSave("save corrupt: header truncated (size=%zu)", size);
+
+        if (memcmp(buf.data(), SAVE_MAGIC, 8) != 0)
+            FatalSave("save corrupt: bad magic (expected GSBX_SAV)");
+
+        uint16_t version = ReadU16(buf.data() + 8);
+        if (version != SAVE_VERSION)
+            FatalSave("save version mismatch: expected %u, got %u", (unsigned)SAVE_VERSION, (unsigned)version);
+
+        // 2. Fixed-size sections present
+        if (size < FIXED_BYTES_BEFORE_DROPS + DROPS_HEADER)
+            FatalSave("save corrupt: section truncated (size=%zu, need %zu)",
+                      size, FIXED_BYTES_BEFORE_DROPS + DROPS_HEADER);
+
+        // 3. World
+        size_t off = HEADER_BYTES;
+        for (int y = 0; y < World::HEIGHT; y++)
+        {
+            for (int x = 0; x < World::WIDTH; x++)
+            {
+                uint8_t fg_type = ReadU8(buf.data() + off + 0);
+                uint8_t fg_hp   = ReadU8(buf.data() + off + 1);
+                uint8_t bg_type = ReadU8(buf.data() + off + 2);
+                uint8_t bg_hp   = ReadU8(buf.data() + off + 3);
+                if (!IsKnownTileType(fg_type))
+                    FatalSave("save corrupt: unknown fg type %u at (%d,%d)", fg_type, x, y);
+                if (!IsKnownTileType(bg_type))
+                    FatalSave("save corrupt: unknown bg type %u at (%d,%d)", bg_type, x, y);
+                Cell& c = w.GetCell(x, y);
+                c.fg.type = (TileTypeID)fg_type;
+                c.fg.hp   = fg_hp;
+                c.bg.type = (TileTypeID)bg_type;
+                c.bg.hp   = bg_hp;
+                c.fg_variant = 0;   // recomputed in step 7 below
+                c.bg_variant = 0;
+                off += 4;
+            }
+        }
+
+        // 4. Player
+        float px = ReadF32(buf.data() + off + 0);
+        float py = ReadF32(buf.data() + off + 4);
+        uint8_t facing = ReadU8(buf.data() + off + 8);
+        // off + 9 = reserved
+        const float worldMaxX = (float)(World::WIDTH  * World::TILE_SIZE_PX);
+        const float worldMaxY = (float)(World::HEIGHT * World::TILE_SIZE_PX);
+        if (px < 0.0f || px > worldMaxX || py < 0.0f || py > worldMaxY)
+            FatalSave("save corrupt: player position out of bounds (%.1f, %.1f)", px, py);
+        p.SetPosition(CL_Vec2f(px, py));
+        p.SetFacing(facing != 0);
+        off += PLAYER_BYTES;
+
+        // 5. Inventory
+        InventorySlot hotbar[Inventory::HOTBAR_SLOTS];
+        InventorySlot backpack[Inventory::BACKPACK_SLOTS];
+        for (int i = 0; i < Inventory::HOTBAR_SLOTS; i++)
+        {
+            uint8_t  t = ReadU8 (buf.data() + off);
+            uint16_t cnt = ReadU16(buf.data() + off + 1);
+            if (!IsKnownTileType(t))
+                FatalSave("save corrupt: hotbar slot %d unknown type %u", i, t);
+            hotbar[i].type  = (TileTypeID)t;
+            hotbar[i].count = cnt;
+            off += 3;
+        }
+        for (int i = 0; i < Inventory::BACKPACK_SLOTS; i++)
+        {
+            uint8_t  t = ReadU8 (buf.data() + off);
+            uint16_t cnt = ReadU16(buf.data() + off + 1);
+            if (!IsKnownTileType(t))
+                FatalSave("save corrupt: backpack slot %d unknown type %u", i, t);
+            backpack[i].type  = (TileTypeID)t;
+            backpack[i].count = cnt;
+            off += 3;
+        }
+        uint8_t selected = ReadU8(buf.data() + off);
+        if (selected >= Inventory::HOTBAR_SLOTS)
+            FatalSave("save corrupt: selected slot %u out of range", selected);
+        off += 1;
+        inv.SetFromSerialized(hotbar, backpack, (int)selected);
+
+        // 6. Drops
+        uint16_t dropCount = ReadU16(buf.data() + off);
+        off += 2;
+        if (dropCount > MAX_DROPS_SAFE)
+            FatalSave("save corrupt: drops sanity cap exceeded (%u > %u)", dropCount, MAX_DROPS_SAFE);
+        const size_t expectedTotal = FIXED_BYTES_BEFORE_DROPS + DROPS_HEADER + (size_t)dropCount * DROP_RECORD;
+        if (size != expectedTotal)
+            FatalSave("save corrupt: size mismatch (got %zu, expected %zu)", size, expectedTotal);
+
+        std::vector<WorldDrop> drops;
+        drops.reserve(dropCount);
+        for (uint16_t i = 0; i < dropCount; i++)
+        {
+            WorldDrop d{};
+            uint8_t  t   = ReadU8 (buf.data() + off + 0);
+            uint16_t cnt = ReadU16(buf.data() + off + 1);
+            float    dx  = ReadF32(buf.data() + off + 3);
+            float    dy  = ReadF32(buf.data() + off + 7);
+            float    vy  = ReadF32(buf.data() + off + 11);
+            float    bob = ReadF32(buf.data() + off + 15);
+            uint8_t  og  = ReadU8 (buf.data() + off + 19);
+            if (!IsKnownTileType(t))
+                FatalSave("save corrupt: drop %u unknown type %u", (unsigned)i, t);
+            d.type     = (TileTypeID)t;
+            d.count    = cnt;
+            d.x        = dx;
+            d.y        = dy;
+            d.vy       = vy;
+            d.bobTimer = bob;
+            d.onGround = (og != 0);
+            drops.push_back(d);
+            off += DROP_RECORD;
+        }
+        w.SetDropsFromSerialized(drops);
+
+        // 7. Recompute autotile variants (we did not save them).
+        w.RecomputeAllVariants();
+
+        return true;
+    }
 }
 
 // Stubs — full implementations follow in later tasks.
