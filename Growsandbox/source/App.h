@@ -37,6 +37,7 @@ public:
 	Inventory& GetInventory() { return m_inventory; }
 	World& GetWorld() { return m_world; }
 	Player& GetPlayer() { return m_player; }
+	bool IsWorldGenerated() const { return m_worldGenerated; }
 	void SetMousePos(const CL_Vec2f& p) { m_mousePos = p; }
 	void SetMouseDown(bool d)            { m_mouseDown = d; }
 

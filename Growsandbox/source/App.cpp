@@ -370,10 +370,17 @@ void AppInputRawKeyboard(VariantList *pVList)
         case VIRTUAL_KEY_F5:
             if (keyInfo == VIRTUAL_KEY_PRESS)
             {
-                bool ok = SaveManager::Save(GetApp()->GetWorld(),
-                                             GetApp()->GetInventory(),
-                                             GetApp()->GetPlayer());
-                LogMsg(ok ? "Manual save OK" : "Manual save FAILED");
+                if (GetApp()->IsWorldGenerated())
+                {
+                    bool ok = SaveManager::Save(GetApp()->GetWorld(),
+                                                 GetApp()->GetInventory(),
+                                                 GetApp()->GetPlayer());
+                    LogMsg(ok ? "Manual save OK" : "Manual save FAILED");
+                }
+                else
+                {
+                    LogMsg("Manual save skipped (world not yet initialized)");
+                }
             }
             keyName = "F5 (Save)";
             break;
