@@ -367,6 +367,16 @@ void AppInputRawKeyboard(VariantList *pVList)
             if (keyInfo == VIRTUAL_KEY_PRESS) GetApp()->GetInventory().SetSelectedHotbarSlot(4);
             keyName = "5 (slot 4)";
             break;
+        case VIRTUAL_KEY_F5:
+            if (keyInfo == VIRTUAL_KEY_PRESS)
+            {
+                bool ok = SaveManager::Save(GetApp()->GetWorld(),
+                                             GetApp()->GetInventory(),
+                                             GetApp()->GetPlayer());
+                LogMsg(ok ? "Manual save OK" : "Manual save FAILED");
+            }
+            keyName = "F5 (Save)";
+            break;
         case 'R':
         case 'r':
             if (keyInfo == VIRTUAL_KEY_PRESS)
