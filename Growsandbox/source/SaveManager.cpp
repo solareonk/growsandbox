@@ -96,8 +96,71 @@ namespace
         return (size_t)t < TileRegistry_GetCount();
     }
 
-    // Forward declarations for serialize/deserialize internals (defined later in file).
-    std::vector<uint8_t> SerializeToBuffer(const World& w, const Inventory& inv, const Player& p);
+    std::vector<uint8_t> SerializeToBuffer(const World& w, const Inventory& inv, const Player& p)
+    {
+        std::vector<uint8_t> buf;
+        const std::vector<WorldDrop>& drops = w.GetDrops();
+        const size_t totalSize = FIXED_BYTES_BEFORE_DROPS + DROPS_HEADER + drops.size() * DROP_RECORD;
+        buf.reserve(totalSize);
+
+        // Header
+        for (int i = 0; i < 8; i++) AppendU8(buf, (uint8_t)SAVE_MAGIC[i]);
+        AppendU16(buf, SAVE_VERSION);
+        AppendU16(buf, 0);   // reserved
+
+        // World cells
+        for (int y = 0; y < World::HEIGHT; y++)
+        {
+            for (int x = 0; x < World::WIDTH; x++)
+            {
+                const Cell& c = w.GetCell(x, y);
+                AppendU8(buf, (uint8_t)c.fg.type);
+                AppendU8(buf, c.fg.hp);
+                AppendU8(buf, (uint8_t)c.bg.type);
+                AppendU8(buf, c.bg.hp);
+            }
+        }
+
+        // Player
+        CL_Vec2f pos = p.GetPosition();
+        AppendF32(buf, pos.x);
+        AppendF32(buf, pos.y);
+        AppendU8 (buf, p.GetFacing() ? 1 : 0);
+        AppendU8 (buf, 0);   // reserved
+
+        // Inventory: hotbar then backpack
+        for (int i = 0; i < Inventory::HOTBAR_SLOTS; i++)
+        {
+            const InventorySlot& s = inv.GetHotbarSlot(i);
+            AppendU8 (buf, (uint8_t)s.type);
+            AppendU16(buf, s.count);
+        }
+        for (int i = 0; i < Inventory::BACKPACK_SLOTS; i++)
+        {
+            const InventorySlot& s = inv.GetBackpackSlot(i);
+            AppendU8 (buf, (uint8_t)s.type);
+            AppendU16(buf, s.count);
+        }
+        AppendU8(buf, (uint8_t)inv.GetSelectedHotbarSlot());
+
+        // Drops
+        AppendU16(buf, (uint16_t)drops.size());
+        for (size_t i = 0; i < drops.size(); i++)
+        {
+            const WorldDrop& d = drops[i];
+            AppendU8 (buf, (uint8_t)d.type);
+            AppendU16(buf, d.count);
+            AppendF32(buf, d.x);
+            AppendF32(buf, d.y);
+            AppendF32(buf, d.vy);
+            AppendF32(buf, d.bobTimer);
+            AppendU8 (buf, d.onGround ? 1 : 0);
+        }
+
+        return buf;
+    }
+
+    // Forward declaration for deserialize internal (defined later in file).
     bool DeserializeFromBuffer(const std::vector<uint8_t>& buf, World& w, Inventory& inv, Player& p);
 }
 
