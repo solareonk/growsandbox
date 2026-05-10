@@ -1519,6 +1519,7 @@
     <ClCompile Include="..\source\Autotile.cpp" />
     <ClCompile Include="..\source\World.cpp" />
     <ClCompile Include="..\source\Inventory.cpp" />
+    <ClCompile Include="..\source\SaveManager.cpp" />
     <ClCompile Include="..\source\Interaction.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -1609,6 +1610,7 @@
     <ClInclude Include="..\source\Autotile.h" />
     <ClInclude Include="..\source\World.h" />
     <ClInclude Include="..\source\Inventory.h" />
+    <ClInclude Include="..\source\SaveManager.h" />
     <ClInclude Include="..\source\Drop.h" />
     <ClInclude Include="..\source\Interaction.h" />
   </ItemGroup>
