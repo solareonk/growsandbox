@@ -29,7 +29,7 @@ namespace
     const size_t PLAYER_BYTES = 10;
     const size_t INV_BYTES    = (size_t)(Inventory::HOTBAR_SLOTS + Inventory::BACKPACK_SLOTS) * 3 + 1;  // 106
     const size_t DROPS_HEADER = 2;
-    const size_t DROP_RECORD  = 22;
+    const size_t DROP_RECORD  = 20;
     const size_t FIXED_BYTES_BEFORE_DROPS = HEADER_BYTES + WORLD_BYTES + PLAYER_BYTES + INV_BYTES;
 
     std::string SavePath()

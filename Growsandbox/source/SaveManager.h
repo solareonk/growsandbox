@@ -6,7 +6,7 @@
 //   world   : 6000 cells * { u8 fg_type, u8 fg_hp, u8 bg_type, u8 bg_hp } = 24000 bytes
 //   player  : f32 x + f32 y + u8 facing_right + u8 reserved               = 10 bytes
 //   inv     : 35 * { u8 type, u16 count } + u8 selected_slot              = 106 bytes
-//   drops   : u16 count + N * { u8 type, u16 count, f32 x, f32 y, f32 vy, f32 bob, u8 on_ground }
+//   drops   : u16 count + N * { u8 type, u16 count, f32 x, f32 y, f32 vy, f32 bob, u8 on_ground } (20 bytes per record)
 //
 // Triggers: load on App::Update first-run gate; save on App::Kill,
 // App::OnEnterBackground, and F5 keypress.
