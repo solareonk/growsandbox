@@ -401,7 +401,8 @@ void SaveManager::SelfTest()
     // Build deterministic test pattern.
     World w; Inventory inv; Player p;
     w.GenerateInitial();
-    w.PunchAt(50, 30);                       // remove a tile
+    // Punch (50,30) until fg breaks (dirt has maxHp>1 — loop is robust to any maxHp).
+    while (w.GetCell(50, 30).fg.type != TILE_AIR) w.PunchAt(50, 30);
     w.PlaceAt(60, 30, TILE_DIRT);            // place a tile
     w.SpawnDrop(TILE_DIRT, 70, 25);          // floating drop
 
