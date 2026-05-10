@@ -289,8 +289,48 @@ namespace
     }
 }
 
-// Stubs — full implementations follow in later tasks.
-bool SaveManager::TryLoad(World&, Inventory&, Player&) { return false; }
+bool SaveManager::TryLoad(World& world, Inventory& inv, Player& player)
+{
+    const std::string path = SavePath();
+
+    // File-existence check via fopen — portable.
+    FILE* fp = fopen(path.c_str(), "rb");
+    if (!fp)
+    {
+        LogMsg("SaveManager: no save file at %s — fresh start", path.c_str());
+        return false;   // NORMAL fresh start, NOT an error
+    }
+
+    // Read full file.
+    if (fseek(fp, 0, SEEK_END) != 0)
+    {
+        fclose(fp);
+        FatalSave("Cannot seek save.dat: %s", strerror(errno));
+    }
+    long sz = ftell(fp);
+    if (sz < 0)
+    {
+        fclose(fp);
+        FatalSave("Cannot tell save.dat size: %s", strerror(errno));
+    }
+    rewind(fp);
+
+    std::vector<uint8_t> buf((size_t)sz);
+    if (sz > 0)
+    {
+        size_t got = fread(buf.data(), 1, (size_t)sz, fp);
+        if (got != (size_t)sz)
+        {
+            fclose(fp);
+            FatalSave("Short read on save.dat (%zu/%ld)", got, sz);
+        }
+    }
+    fclose(fp);
+
+    DeserializeFromBuffer(buf, world, inv, player);
+    LogMsg("SaveManager: loaded %s (%ld bytes)", path.c_str(), sz);
+    return true;
+}
 bool SaveManager::Save(const World& world, const Inventory& inv, const Player& player)
 {
     // 1. Build buffer in memory.
