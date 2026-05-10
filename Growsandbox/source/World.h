@@ -52,6 +52,13 @@ public:
     const std::vector<WorldDrop>& GetDrops() const { return m_drops; }
     void ClearDrops() { m_drops.clear(); }
 
+    // Phase 3d save: restore drops list from save file.
+    void SetDropsFromSerialized(const std::vector<WorldDrop>& drops) { m_drops = drops; }
+
+    // Phase 3d save: bulk-recompute autotile variants for all cells (used after load).
+    // Equivalent to the per-cell pass at the end of GenerateInitial.
+    void RecomputeAllVariants();
+
 private:
     Cell m_cells[WIDTH * HEIGHT];
     std::vector<WorldDrop> m_drops;
