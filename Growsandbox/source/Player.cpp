@@ -262,3 +262,10 @@ void Player::Draw(const Camera &camera)
         DrawFilledRect(screenPos.x, screenPos.y, WIDTH, HEIGHT, MAKE_RGBA(50, 100, 220, 255));
     }
 }
+
+void Player::SetPosition(const CL_Vec2f& pos)
+{
+    m_position = pos;
+    m_velocity = CL_Vec2f(0.0f, 0.0f);
+    m_onGround = false;
+}
